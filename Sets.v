@@ -1,28 +1,23 @@
-Require Import List PeanoNat Omega Bool.
+Require Import List PeanoNat Omega Bool MSets MSetDecide Ensembles.
 
 Import ListNotations.
 
-Parameter A : Set.
+Module S := Make Nat_as_OT.
 
-Definition set (A : Set) := A -> bool.
+Definition member (s : S.t) := {x : S.elt | S.mem x s = true}.
+Definition subset (s : S.t) := {a : S.t | forall (x : S.elt), S.mem x a = true -> S.mem x s = true}.
 
-Fixpoint contains {A : Set} {eq : A -> A -> bool} (v : list A) (e : A) : bool :=
-  match v with
-  | [] => false
-  | x :: xs => if eq e x then true else @contains A eq xs e
-  end.
+Lemma empty_set_is_subset : forall {s : S.t} (x : S.elt), S.mem x S.empty = true -> S.mem x s = true.
+Proof.
+intuition.
+Qed.
 
-Arguments contains {A} {eq} _ _.
+Lemma full_set_is_subset : forall {s : S.t} (x : S.elt), S.mem x s = true -> S.mem x s = true.
+Proof.
+intuition.
+Qed.
 
-Definition element (l : list nat) := {x : nat | @contains nat beq_nat l x = true}.
-Definition subset (l : list nat) := element l -> bool.
+Definition empty_set {s : S.t} : subset s := exist _ S.empty empty_set_is_subset.
+Definition full_set {s : S.t} : subset s := exist _ s full_set_is_subset.
 
-Definition set_eq (A : Set) (x y : set A) : Prop := forall (e : A), x e = y e.
-
-Definition cart_prod (A B : Set) (a : set A) (b : set B) : set (A * B) := 
-  fun p => 
-    match p with
-    | pair x y => (a x) && (b y)
-    end.
-
-Arguments cart_prod {A} {B} _ _.
+Hint Resolve empty_set_is_subset full_set_is_subset : sets.
