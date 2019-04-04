@@ -13,6 +13,7 @@ Ltac simplify :=
     try autounfold with sets;
     try assumption;
     try trivial;
+    try split;
     try contradiction;
     try congruence;
     try omega
