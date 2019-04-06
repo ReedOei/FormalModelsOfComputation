@@ -297,3 +297,72 @@ induction (F_dec M a).
 induction (F_dec N c). intuition. intuition.
 induction (F_dec N c). intuition. intuition.
 Qed.
+
+Definition not_dfa_f_bool
+  {A B : Type} `{EqA : DecEq A, EqB : DecEq B}
+   (M : dfa A B) (q : A) : bool := if F_dec M q then false else true.
+
+Definition not_dfa_f
+  {A B : Type} `{EqA : DecEq A, EqB : DecEq B}
+   (M : dfa A B) (q : A) : Prop := not_dfa_f_bool M q = true.
+
+Lemma not_dfa_f_dec
+  {A B : Type} `{EqA : DecEq A, EqB : DecEq B}
+   (M : dfa A B) (q : A) : {not_dfa_f M q} + {~not_dfa_f M q}.
+Proof.
+intuition.
+unfold not_dfa_f, not_dfa_f_bool.
+induction (F_dec M q).
+intuition.
+intuition.
+Qed.
+
+Definition not_dfa
+   {A B : Type} `{EqA : DecEq A, EqB : DecEq B}
+   (M : dfa A B) : dfa A B :=
+  Build_dfa A B EqA EqB (t M) (s M) (not_dfa_f M) (not_dfa_f_dec M).
+
+Theorem not_dfa_mirror
+   {A B : Type} `{EqA : DecEq A, EqB : DecEq B}
+   (M : dfa A B) : forall (str : list B), tStar M (s M) str = tStar (not_dfa M) (s M) str.
+Proof.
+apply app_induction.
+
+intuition.
+
+intuition.
+rewrite tStar_step.
+rewrite tStar_step.
+simpl.
+rewrite H.
+intuition.
+Qed.
+
+Theorem not_dfa_correct
+   {A B : Type} `{EqA : DecEq A, EqB : DecEq B}
+   (M : dfa A B) : 
+   forall (str : list B), accepted M str = true <-> accepted (not_dfa M) str = false.
+Proof.
+intros.
+unfold accepted.
+simpl.
+rewrite not_dfa_mirror.
+
+intuition.
+induction (not_dfa_f_dec M (tStar (not_dfa M) (s M) str)).
+unfold not_dfa_f, not_dfa_f_bool in a.
+induction (F_dec M (tStar (not_dfa M) (s M) str)).
+intuition.
+intuition.
+intuition.
+
+induction (not_dfa_f_dec M (tStar (not_dfa M) (s M) str)).
+unfold not_dfa_f, not_dfa_f_bool in a.
+induction (F_dec M (tStar (not_dfa M) (s M) str)).
+intuition.
+intuition.
+unfold not_dfa_f, not_dfa_f_bool in b.
+induction (F_dec M (tStar (not_dfa M) (s M) str)).
+intuition.
+intuition.
+Qed.
