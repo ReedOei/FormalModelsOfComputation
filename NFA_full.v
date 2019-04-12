@@ -2,10 +2,6 @@ Require Import List Bool DFA AutomataTactics.
 
 Import ListNotations.
 
-Axiom functional_extensionality :
-  forall {A B : Type} {f g : A -> B}
-    (prf : forall (x : A), f x = g x), f = g.
-
 Structure nfa (A B : Type) := {
   nt : A -> B -> list A;
   ns : A;
@@ -59,13 +55,6 @@ rewrite <- IHxs.
 apply flat_map_app.
 Qed.
 
-Lemma flat_map_equality :
-  forall {A B : Type} (f g : A -> list B) (xs : list A),
-    f = g -> flat_map f xs = flat_map g xs.
-Proof.
-congruence.
-Qed.
-
 Lemma ntStar_step {A B : Type} (M : nfa A B) :
   forall (str : list B) (x : B) (q : A),
     ntStar M q (str ++ [x]) = flat_map (fun st => nt M st x) (ntStar M q str).
@@ -79,8 +68,10 @@ apply flat_map_id.
 intuition.
 simpl.
 rewrite flat_map_comp.
-apply flat_map_equality.
-now (apply functional_extensionality).
+induction (nt M q a).
+intuition.
+simpl.
+now (rewrite IHl, IHstr).
 Qed.
 
 Definition dfa_to_nfa {A B : Type} (M : dfa A B) : nfa A B :=
@@ -115,23 +106,16 @@ simpl in H.
 now (rewrite orb_false_r in H).
 Qed.
 
-Definition powerset_nfa_trans
-  {A B : Type} (M : nfa A B) (possible : list A) (x : B) : list A :=
+Definition powerset_nfa_trans {A B : Type} (M : nfa A B) (possible : list A) (x : B) : list A :=
     flat_map (fun source => nt M source x) possible.
 
-Definition powerset_nfa_f
-  {A B : Type} (M : nfa A B) (possible : list A) : bool :=
+Definition powerset_nfa_f {A B : Type} (M : nfa A B) (possible : list A) : bool :=
     existsb (nF M) possible.
 
-Definition powerset_nfa
-  {A B : Type} (M : nfa A B) : dfa (list A) B :=
-    Build_dfa (list A) B 
-      (powerset_nfa_trans M) 
-      [ns M]
-      (powerset_nfa_f M).
+Definition powerset_nfa {A B : Type} (M : nfa A B) : dfa (list A) B :=
+    Build_dfa (list A) B (powerset_nfa_trans M) [ns M] (powerset_nfa_f M).
 
-Lemma powerset_nfa_mirror
-  {A B : Type} (M : nfa A B) :
+Lemma powerset_nfa_mirror {A B : Type} (M : nfa A B) :
     forall (str : list B),
       tStar (powerset_nfa M) (s (powerset_nfa M)) str = ntStar M (ns M) str.
 Proof.

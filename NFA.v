@@ -2,9 +2,8 @@ Require Import List Bool DFA AutomataTactics.
 
 Import ListNotations.
 
-Axiom functional_extensionality :
-  forall {A B : Type} {f g : A -> B}
-    (prf : forall (x : A), f x = g x), f = g.
+(* Note this file contains a lot of heavily automated proofs: 
+   for step-by-step versions, look in NFA_full.v *)
 
 Structure nfa (A B : Type) := {
   nt : A -> B -> list A;
@@ -27,13 +26,13 @@ Definition naccepted {A B : Type} (M : nfa A B) (str : list B) : bool :=
   existsb (nF M) (ntStar M (ns M) str).
 
 Lemma flat_map_id :
-  forall (A : Type) (xs : list A), flat_map (fun x => [x]) xs = xs.
+  forall {A : Type} (xs : list A), flat_map (fun x => [x]) xs = xs.
 Proof.
 autoinduction on xs.
 Qed.
 
 Lemma flat_map_app :
-  forall (A B : Type) {f : A -> list B} (xs ys : list A),
+  forall {A B : Type} {f : A -> list B} (xs ys : list A),
     flat_map f (xs ++ ys) = flat_map f xs ++ flat_map f ys.
 Proof.
 autoinduction on xs.
@@ -46,13 +45,6 @@ Proof.
 autoinduction xs with (apply flat_map_app).
 Qed.
 
-Lemma flat_map_equality :
-  forall {A B : Type} (f g : A -> list B) (xs : list A),
-    f = g -> flat_map f xs = flat_map g xs.
-Proof.
-congruence.
-Qed.
-
 Lemma ntStar_step {A B : Type} (M : nfa A B) :
   forall (str : list B) (x : B) (q : A),
     ntStar M q (str ++ [x]) = flat_map (fun st => nt M st x) (ntStar M q str).
@@ -60,8 +52,8 @@ Proof.
 autoinduction str with (apply flat_map_id).
 
 rewrite flat_map_comp.
-apply flat_map_equality.
-now (apply functional_extensionality).
+set (q' := nt M q a).
+autoinduction q' with (rewrite IHstr).
 Qed.
 
 Definition dfa_to_nfa {A B : Type} (M : dfa A B) : nfa A B :=

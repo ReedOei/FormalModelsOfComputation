@@ -8,6 +8,7 @@ The source code for the tutorials on my [blog](http://reedoei.com/blog), a WIP s
 - Regular Expressions (TODO)
 - Equivalence of DFAs, NFAs, and Regular Expressions
 - Proving Regularity and Irregularity of Langauges (TODO)
+- DFA Minimization
 - Decidability of formulas stated in terms of automata (TODO)
 - Context Free Languages
 - Pushdown Automata
