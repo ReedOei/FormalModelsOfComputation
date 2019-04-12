@@ -2,25 +2,52 @@ Require Import List Bool.
 
 Import ListNotations.
 
-Class DecEq {a : Type} := {
-  deq (x y : a) : {x = y} + {x <> y}
+Class DecEq {A : Type} := {
+  deq (x y : A) : {x = y} + {x <> y}
 }.
 
 Notation "a =? b" := (if deq a b then true else false) (at level 70, no associativity).
 Notation "a == b" := (deq a b) (at level 70, no associativity).
 
-Inductive Elem {a : Type}: a -> list a -> Prop :=
+Inductive Elem {a : Type} : a -> list a -> Prop :=
   | Here (x : a) (xs : list a) : Elem x (x :: xs)
   | There (x y : a) (xs : list a) (prf : Elem x xs) : Elem x (y :: xs).
 
 Definition Member {a : Type} (xs : list a) := 
   { x : a | Elem x xs }.
 
-Definition IsSubset {A : Type} (ys : list A) (xs : list A) := 
-  forall (x : A), Elem x ys -> Elem x xs.
+Inductive Distinct {A : Type} : list A -> Prop :=
+  | Empty : Distinct []
+  | Cons (x : A) (xs : list A) : ~(Elem x xs) -> Distinct xs -> Distinct (x :: xs).
+
+Inductive IsSubset {A : Type} : list A -> list A -> Prop :=
+  | Same (xs : list A) : Distinct xs -> IsSubset xs xs
+  | Prepend (x : A) (xs ys : list A) : ~(Elem x xs) -> IsSubset xs ys -> IsSubset xs (x :: ys).
 
 Definition Subset {a : Type} (xs : list a) := 
   { ys : list a | IsSubset ys xs }.
+
+Definition FinType (A : Type) := { all : list A | forall (x : A), Elem x all }.
+
+Definition enum {A : Type} (fin : FinType A) : list A :=
+  match fin with
+  | exist _ l _ => l
+  end.
+
+Definition FinSubset {A : Type} (xs : list A) (fin : FinType A) := IsSubset xs (enum fin).
+
+Definition ext_eq {A : Type} (xs ys : list A) := forall (x : A), Elem x xs <-> Elem x ys.
+
+Lemma subset_prop :
+  forall {A : Type} (xs ys : list A), 
+    IsSubset xs ys -> forall (x : A), Elem x xs -> Elem x ys.
+Proof.
+intuition.
+induction H.
+assumption.
+constructor.
+intuition.
+Qed.
 
 Lemma elem_lemma {a : Type} `{DecEq a} : 
   forall (x y : a) (xs : list a), Elem x (y :: xs) -> x <> y -> Elem x xs.
@@ -60,14 +87,9 @@ Lemma subset_of_empty_is_empty :
   forall {A : Type} (ys : list A), IsSubset ys [] -> ys = [].
 Proof.
 intuition.
-induction ys.
+inversion H.
 reflexivity.
-
-pose proof H a (Here a ys).
-inversion H0.
 Qed.
-
-Definition FinType (A : Type) := exists (all : list A), forall (x : A), Elem x all.
 
 Lemma prod_eq : forall {A B : Type} {a1 a2 : A} {b1 b2 : B}, a1 = a2 -> b1 = b2 -> (a1,b1) = (a2,b2).
 Proof.
@@ -333,7 +355,7 @@ pose proof IHl1 H3.
 intuition.
 exact (cart_prod_second b (ex_intro _ a0 H)).
 Qed.
-
+(* 
 Lemma cart_prod_of_subset : 
   forall {A B : Type} {l1 : list A} {l2 : list B} `{EqA : DecEq A, EqB : DecEq B}
          (s1 : Subset l1) (s2 : Subset l2), 
@@ -346,7 +368,8 @@ intuition.
 destruct s1. destruct s2.
 intuition.
 destruct (member_cart_prod (a,b) H).
-exact (pair_member (i a H0) (i0 b H1)).
+destruct i. destruct i0.
+exact (pair_member (H3 a H0) (H5 b H1)).
 Qed.
 
 Definition cart_prod_subset 
@@ -354,9 +377,9 @@ Definition cart_prod_subset
   (s1 : Subset l1) (s2 : Subset l2) : list (A * B) :=
   match s1, s2 with
   | exist _ l1' _, exist _ l2' _ => cart_prod l1' l2'
-  end.
+  end. *)
 
-Lemma make_subset_prod 
+(* Lemma make_subset_prod 
   {A B : Type} {l1 : list A} {l2 : list B} `{EqA : DecEq A, EqB : DecEq B}
   (s1 : Subset l1) (s2 : Subset l2) : IsSubset (cart_prod_subset s1 s2) (cart_prod l1 l2).
 Proof.
@@ -367,7 +390,7 @@ destruct x.
 unfold cart_prod_subset in H.
 destruct s1. destruct s2.
 exact (H0 a b H).
-Qed.
+Qed. *)
 
 Lemma empty_has_no_app :
   forall {A : Type} (x : A) (xs : list A),
@@ -417,14 +440,239 @@ exists a0. exists xs.
 reflexivity.
 Qed.
 
+Lemma pair_with_distinct :
+  forall {A B : Type} (x : A) (ys : list B),
+    Distinct ys -> Distinct (pair_with x ys).
+Proof.
+intuition.
+induction ys.
+simpl.
+constructor.
+simpl.
+inversion H.
+constructor.
+contradict H2.
+exact (pair_with_second x a H2).
+intuition.
+Qed.
+
 Lemma prod_of_fin_is_fin :
   forall {A B : Type}, FinType A -> FinType B -> FinType (A * B).
 Proof.
 intuition.
 unfold FinType.
-destruct H.
-destruct H0.
+destruct X.
+destruct X0.
 exists (cart_prod x x0).
 intuition.
-exact (pair_member (H a) (H0 b)).
+exact (pair_member (e a) (e0 b)).
 Qed.
+
+Lemma map_form : 
+  forall {A B : Type} {f : A -> B} (xs : list A) (b : B), 
+    Elem b (map f xs) -> exists (x : A), Elem x xs /\ f x = b.
+Proof.
+intuition.
+induction xs.
+inversion H.
+simpl in H.
+inversion H.
+exists a.
+intuition.
+constructor.
+destruct (IHxs prf).
+exists x0.
+intuition.
+constructor.
+intuition.
+Qed.
+
+Fixpoint powerset {A : Type} (xs : list A) : list (list A) :=
+  match xs with
+  | []      => [[]]
+  | x :: xs => powerset xs ++ map (fun subset => x :: subset) (powerset xs)
+  end.
+
+Lemma flat_map_works :
+  forall {A B : Type} {f : A -> list B} (xs : list A) (a : A) (b : B), 
+    Elem a xs -> Elem b (f a) -> Elem b (flat_map f xs).
+Proof.
+intuition.
+induction xs.
+
+inversion H.
+simpl.
+inversion H.
+rewrite <- H3.
+exact (elem_append_l b H0).
+exact (elem_append_r b (IHxs prf)).
+Qed.
+
+Lemma powerset_no_discard :
+  forall {A : Type} (x : A) (xs : list A) (ys : list A),
+    Elem ys (powerset xs) -> Elem ys (powerset (x :: xs)).
+Proof.
+intuition.
+induction xs.
+
+simpl in H.
+inversion H.
+simpl.
+constructor.
+inversion prf.
+
+simpl.
+simpl in H.
+inversion H.
+constructor.
+
+rewrite H2.
+apply elem_append_l.
+assumption.
+Qed.
+
+Lemma powerset_has_empty : 
+  forall {A : Type} (xs : list A), Elem [] (powerset xs).
+Proof.
+intuition.
+induction xs.
+
+simpl.
+constructor.
+
+apply powerset_no_discard.
+assumption.
+Qed.
+
+Lemma empty_is_subset :
+  forall {A : Type} (xs : list A), IsSubset [] xs.
+Proof.
+intuition.
+induction xs.
+constructor.
+constructor.
+
+constructor.
+
+inversion IHxs.
+intuition.
+inversion H2.
+intuition.
+inversion H3.
+assumption.
+Qed.
+
+Lemma tail_of_subset_is_subset :
+  forall {A : Type} (x : A) (xs : list A) (ys : list A),
+    IsSubset (x :: xs) ys -> IsSubset xs ys.
+Proof.
+intuition.
+induction xs.
+apply empty_is_subset.
+
+inversion H.
+constructor.
+inversion H0.
+assumption.
+constructor.
+inversion H0.
+assumption.
+constructor.
+intuition.
+contradict H0.
+constructor.
+assumption.
+induction ys.
+inversion H3.
+
+Qed.
+
+Lemma subset_nonempty_supset_nonempty :
+  forall {A : Type} (x : A) (xs : list A) (ys : list A),
+    IsSubset (x :: xs) ys -> exists (z : A) (zs : list A), ys = z :: zs.
+Proof.
+intuition.
+induction ys.
+
+pose proof subset_of_empty_is_empty (x :: xs) H.
+inversion H0.
+
+exists a.
+exists ys.
+reflexivity.
+Qed.
+
+Lemma map_works :
+  forall {A B : Type} {f : A -> B} (x : A) (xs : list A),
+    Elem x xs -> Elem (f x) (map f xs).
+Proof.
+intuition.
+induction xs.
+inversion H.
+simpl.
+inversion H.
+constructor.
+constructor.
+exact (IHxs prf).
+Qed.
+
+Lemma app_elem : 
+  forall {A : Type} (l1 l2 : list A) (x : A), Elem x (l1 ++ l2) -> Elem x l1 \/ Elem x l2.
+Proof.
+intuition.
+induction l1.
+right.
+simpl in H.
+assumption.
+simpl in H.
+inversion H.
+left.
+constructor.
+intuition.
+constructor.
+constructor.
+assumption.
+Qed.
+
+Lemma powerset_has_all_sets :
+  forall {A : Type} (xs : list A) (ys : list A), 
+    IsSubset ys xs -> Elem ys (powerset xs).
+Proof.
+intuition.
+
+induction ys.
+
+apply powerset_has_empty.
+
+pose proof IHys (tail_of_subset_is_subset a ys xs H).
+unfold IsSubset in H.
+intuition.
+
+pose proof H2 a (Here a ys).
+inversion H.
+simpl.
+
+rewrite <- H4 in H0.
+simpl in H0.
+apply app_elem in H0.
+induction H0.
+apply elem_append_r.
+apply map_works.
+assumption.
+apply map_form in H0.
+destruct H0.
+intuition.
+inversion H1.
+rewrite <- H6 in H0.
+pose proof H0 (Here a x0).
+contradiction.
+
+rewrite H4.
+unfold powerset.
+
+(* This isn't right because the powerset definition doesn't
+   actually produce every sublist, just every subsequence. Fix
+   or just *)
+
+simpl.
+apply elem_append_r.
