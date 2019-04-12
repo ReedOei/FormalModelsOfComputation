@@ -29,21 +29,34 @@ Definition naccepted {A B : Type} (M : nfa A B) (str : list B) : bool :=
 Lemma flat_map_id :
   forall (A : Type) (xs : list A), flat_map (fun x => [x]) xs = xs.
 Proof.
-autoinduction on xs.
+intuition.
+induction xs.
+intuition.
+simpl.
+now (rewrite IHxs).
 Qed.
 
 Lemma flat_map_app :
   forall (A B : Type) {f : A -> list B} (xs ys : list A),
     flat_map f (xs ++ ys) = flat_map f xs ++ flat_map f ys.
 Proof.
-autoinduction on xs.
+intuition.
+induction xs.
+intuition.
+simpl.
+now (rewrite IHxs, app_assoc).
 Qed.
 
 Lemma flat_map_comp :
   forall {A B C : Type} {f1 : A -> list B} {f2 : B -> list C} (xs : list A),
     flat_map f2 (flat_map f1 xs) = flat_map (fun x => flat_map f2 (f1 x)) xs.
 Proof.
-autoinduction xs with (apply flat_map_app).
+intuition.
+induction xs.
+intuition.
+simpl.
+rewrite <- IHxs.
+apply flat_map_app.
 Qed.
 
 Lemma flat_map_equality :
@@ -57,8 +70,14 @@ Lemma ntStar_step {A B : Type} (M : nfa A B) :
   forall (str : list B) (x : B) (q : A),
     ntStar M q (str ++ [x]) = flat_map (fun st => nt M st x) (ntStar M q str).
 Proof.
-autoinduction str with (apply flat_map_id).
+induction str.
+intuition.
+simpl.
+rewrite app_nil_r.
+apply flat_map_id.
 
+intuition.
+simpl.
 rewrite flat_map_comp.
 apply flat_map_equality.
 now (apply functional_extensionality).
@@ -70,7 +89,11 @@ Definition dfa_to_nfa {A B : Type} (M : dfa A B) : nfa A B :=
 Lemma dfa_to_nfa_mirror {A B : Type} (M : dfa A B) :
   forall (str : list B), [tStar M (s M) str] = ntStar (dfa_to_nfa M) (ns (dfa_to_nfa M)) str.
 Proof.
-auto_rev_ind str with (rewrite tStar_step, ntStar_step).
+apply rev_ind.
+intuition.
+
+intuition.
+now (rewrite tStar_step, ntStar_step, <- H).
 Qed.
 
 Theorem dfa_to_nfa_correct :
@@ -112,7 +135,13 @@ Lemma powerset_nfa_mirror
     forall (str : list B),
       tStar (powerset_nfa M) (s (powerset_nfa M)) str = ntStar M (ns M) str.
 Proof.
-auto_rev_ind str with (rewrite tStar_step, ntStar_step).
+apply rev_ind.
+intuition.
+intuition.
+rewrite tStar_step, ntStar_step.
+simpl.
+unfold powerset_nfa_trans.
+now (rewrite <- H).
 Qed.
 
 Theorem powerset_nfa_correct :
