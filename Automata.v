@@ -2,8 +2,6 @@ Require Import List Bool.
 
 Import ListNotations.
 
-Require Import FinSets.
-
 Section DFA.
 
 Structure dfa (A B : Type) := {
@@ -183,21 +181,6 @@ Definition powerset_nfa
       (powerset_nfa_trans M) 
       [ns M]
       (powerset_nfa_f M).
-
-Lemma flat_map_works :
-  forall {A B : Type} {f : A -> list B} (xs : list A) (a : A) (b : B), 
-    Elem a xs -> Elem b (f a) -> Elem b (flat_map f xs).
-Proof.
-intuition.
-induction xs.
-
-inversion H.
-simpl.
-inversion H.
-rewrite <- H3.
-exact (elem_append_l b H0).
-exact (elem_append_r b (IHxs prf)).
-Qed.
 
 Lemma flat_map_id :
   forall {A : Type} (xs : list A), flat_map (fun x => [x]) xs = xs.
