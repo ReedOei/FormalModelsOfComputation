@@ -561,7 +561,7 @@ intuition.
 inversion H3.
 assumption.
 Qed.
-
+(* 
 Lemma tail_of_subset_is_subset :
   forall {A : Type} (x : A) (xs : list A) (ys : list A),
     IsSubset (x :: xs) ys -> IsSubset xs ys.
@@ -632,8 +632,8 @@ intuition.
 constructor.
 constructor.
 assumption.
-Qed.
-
+Qed. *)
+(* 
 Lemma powerset_has_all_sets :
   forall {A : Type} (xs : list A) (ys : list A), 
     IsSubset ys xs -> Elem ys (powerset xs).
@@ -675,4 +675,4 @@ unfold powerset.
    or just *)
 
 simpl.
-apply elem_append_r.
+apply elem_append_r. *)

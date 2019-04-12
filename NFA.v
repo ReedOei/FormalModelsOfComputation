@@ -19,24 +19,6 @@ Fixpoint ntStar {A B : Type} (M : nfa A B) (q : A) (str : list B) : list A :=
   | x :: xs => flat_map (fun st => ntStar M st xs) (nt M q x)
   end.
 
-Definition naccepted {A B : Type} (M : nfa A B) (str : list B) : bool :=
-  existsb (nF M) (ntStar M (ns M) str).
-
-Definition powerset_nfa_trans
-  {A B : Type} (M : nfa A B) (possible : list A) (x : B) : list A :=
-    flat_map (fun source => nt M source x) possible.
-
-Definition powerset_nfa_f
-  {A B : Type} (M : nfa A B) (possible : list A) : bool :=
-    existsb (nF M) possible.
-
-Definition powerset_nfa
-  {A B : Type} (M : nfa A B) : dfa (list A) B :=
-    Build_dfa (list A) B 
-      (powerset_nfa_trans M) 
-      [ns M]
-      (powerset_nfa_f M).
-
 Lemma flat_map_id :
   forall {A : Type} (xs : list A), flat_map (fun x => [x]) xs = xs.
 Proof.
@@ -104,6 +86,62 @@ apply functional_extensionality.
 intuition.
 Qed.
 
+Definition naccepted {A B : Type} (M : nfa A B) (str : list B) : bool :=
+  existsb (nF M) (ntStar M (ns M) str).
+
+Definition dfa_to_nfa {A B : Type} (M : dfa A B) : nfa A B :=
+  Build_nfa A B (fun st x => [t M st x]) (s M) (F M).
+
+Lemma dfa_to_nfa_mirror {A B : Type} (M : dfa A B) :
+  forall (str : list B), [tStar M (s M) str] = ntStar (dfa_to_nfa M) (ns (dfa_to_nfa M)) str.
+Proof.
+apply rev_ind.
+intuition.
+
+intuition.
+rewrite tStar_step.
+rewrite ntStar_step.
+rewrite <- H.
+simpl.
+reflexivity.
+Qed.
+
+Theorem dfa_to_nfa_correct :
+  forall {A B : Type} (M : dfa A B) (str : list B), 
+    accepted M str = true <-> naccepted (dfa_to_nfa M) str = true.
+Proof.
+intuition.
+
+unfold accepted in H.
+unfold naccepted.
+rewrite <- dfa_to_nfa_mirror.
+simpl.
+rewrite H.
+intuition.
+
+unfold accepted.
+unfold naccepted in H.
+rewrite <- dfa_to_nfa_mirror in H.
+simpl in H.
+rewrite orb_false_r in H.
+assumption.
+Qed.
+
+Definition powerset_nfa_trans
+  {A B : Type} (M : nfa A B) (possible : list A) (x : B) : list A :=
+    flat_map (fun source => nt M source x) possible.
+
+Definition powerset_nfa_f
+  {A B : Type} (M : nfa A B) (possible : list A) : bool :=
+    existsb (nF M) possible.
+
+Definition powerset_nfa
+  {A B : Type} (M : nfa A B) : dfa (list A) B :=
+    Build_dfa (list A) B 
+      (powerset_nfa_trans M) 
+      [ns M]
+      (powerset_nfa_f M).
+
 Lemma powerset_nfa_mirror
   {A B : Type} (M : nfa A B) :
     forall (str : list B),
@@ -120,23 +158,21 @@ rewrite <- H.
 intuition.
 Qed.
 
-Theorem powerset_nfa_correct
-  {A B : Type} (M : nfa A B) :
-    forall (str : list B), accepted (powerset_nfa M) str = true <-> naccepted M str = true.
+Theorem powerset_nfa_correct :
+  forall {A B : Type} (M : nfa A B) (str : list B),
+    accepted (powerset_nfa M) str = true <-> naccepted M str = true.
 Proof.
-apply rev_ind.
-
 intuition.
 
-intuition.
-unfold accepted, powerset_nfa in H.
+unfold accepted in H.
+unfold naccepted.
+simpl in H.
 rewrite (powerset_nfa_mirror M) in H.
 intuition.
 
+unfold accepted.
 unfold naccepted in H.
-rewrite <- (powerset_nfa_mirror M) in H.
-rewrite tStar_step in H.
 simpl.
-rewrite tStar_step.
+rewrite <- (powerset_nfa_mirror M) in H.
 intuition.
 Qed.
