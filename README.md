@@ -4,12 +4,13 @@ The source code for the tutorials on my [blog](http://reedoei.com/blog), a WIP s
 
 - Introduction: [Part 1](http://reedoei.com/blog?post=A%20Formal%20Introduction%20to%20Models%20of%20Computation%20in%20Coq%20%28Part%201%29)
 - DFAs: [Part 2](http://reedoei.com/blog?post=A%20Formal%20Introduction%20to%20Models%20of%20Computation%20in%20Coq%20%28Part%202%29)
-- NFAs (TODO)
-- Regular Expressions (TODO)
+- NFAs
+- Proof Automation
+- Regular Expressions
 - Equivalence of DFAs, NFAs, and Regular Expressions
-- Proving Regularity and Irregularity of Langauges (TODO)
+- Proving Regularity and Irregularity of Langauges
 - DFA Minimization
-- Decidability of formulas stated in terms of automata (TODO)
+- Decidability of formulas stated in terms of automata
 - Context Free Languages
 - Pushdown Automata
 - Probably more

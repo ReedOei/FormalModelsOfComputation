@@ -1,0 +1,525 @@
+\section{Nondeterministic Finite Automata}
+
+In the previous section, we talked about our first model of computation, the deterministic finite automaton, or DFA.
+It was very simple, but we can see that it is capable of some computation, and furthermore, they have nice closure properties that make working with them easier.
+
+This time, we'll talk about a new model of computation, learn about some new Coq features, and prove theorems about Coq programs, rather than just about our own definitions.
+
+You may be wondering why we care to specify that DFAs are deterministic; after all, that tends to be the default in mathematics.
+What would a *nondeterministic* finite automaton look like?
+
+Well, wonder no longer!
+Or maybe do, as it probably instructive to attempt to think about what it would mean, before reading on.
+
+\subsection{More Powerful Models of Computation}
+
+\subsubsection{Are there languages not recognized by a DFA?}
+
+Before we ask the question, "What's more 'powerful' than a DFA?", whatever "powerful" means, we should ask: "Is there anything more 'powerful' than a DFA?"
+And we'll start by defining what we mean by "powerful".
+If you recall, we defined computation as the process of deciding whether a string is in a language or not; that is, defining a language, or set of string.
+We can say that a model of computation can recognize some set of languages (that is, all languages recognized by any DFA).
+Then a more powerful model of computation would be one which can decide all the languages that a DFA can, **and** at least one other languages.
+
+Let's consider whether there are **any** languages that cannot be defined by a DFA.
+We'll formalize this later, but the short answer is "yes".
+Intuitively, this probably makes sense: DFAs only have a finite amount of "memory", in the form of states.
+
+For example, how would you build a DFA that recognizes whether the length of a string was some prime number?
+Of course, you can do this for any *particular* prime number (just make a DFA with as many states as you wish, and advance by one state each time); the problem comes with trying to do it for *every* prime number.
+This intuitively requires us to be able to do arbitrary precision arithmetic.
+Your computer needs arbitrarily large amounts of memory to do this, so how would a DFA be able to do it with a finite amount of memory?
+Again, we'll formalize this later, but for now hopefully you're convinced that **some** languages are not recognizable by a DFA.
+
+\subsubsection{Can we do better than DFAs?}
+
+So there are some languages not recognizable by a DFA.
+
+Let's try to do better, but keep it simple so we can still prove things about it.
+For example, while your laptop may be capable of computing basically anything, we don't want to be simulating the entirety of a modern CPU in Coq.
+Instead, let's start out much more modest.
+
+Suppose we want to write a DFA that recognizes strings where the third to last symbol is the same as the last symbol.
+We can make a DFA for this, but it's pretty atrocious:
+
+% <img src="http://reedoei.com/files/dfa-example-third-to-last.svg" style="width: 50%; height: 50%">
+
+Intuitively, this is because we want to "remember" something, and we've discussed how lack of memory can be an issue for DFAs (though in this case, it's still possible, of course).
+Consider the following "DFA" instead.
+I say "DFA" in quotes, because as you can see, it's not a DFA: there are multiple transitions per state, and some states don't have transitions for every letter.
+
+% <img src="http://reedoei.com/files/nfa-example-third-to-last.svg" style="width: 50%; height: 50%">
+
+But, if you follow the arrows, you'll notice it accepts the same strings as the first DFA.
+However, you can get "stuck" if you follow the wrong transition for the letter \mintinline{coq}{a} or \mintinline{coq}{b} from the initial state.
+To handle this, we'll just say that as long as there's some walk through the graph that gets you to a final state, the string is accepted, and that solves our problem.
+As you can see, we used far fewer states writing this automaton than the other; maybe this is a more powerful model of computation.
+
+Let's define them more precisely.
+
+\subsubsection{NFA Definition}
+
+We call automata like this *nondeterministic finite automata*, or NFAs (maybe it should be NFAa and DFAa, because of the Greek-style pluralization...).
+We define NFAs to be tuples $(Q, \Sigma, \delta, s, F)$, similarly to DFAs.
+The only difference is in $\delta$.
+
+Instead of the "type" of $\delta$ being $Q \times \Sigma \rightarrow Q$, it is $Q \times \Sigma \rightarrow \mathcal{P}(Q)$, that is, the codomain is the powerset of $Q$.
+In other words, the function gives you a whole **set** of possible states you could be in!
+This gives us the behavior of the NFA shown above.
+Instead of saying something like $\delta(0, a) = 1$, we say $\delta(0, a) = \{0,1\}$.
+That is, if we're in the first state, and we see the letter \mintinline{coq}{a}, we can *either* go to state 0 or to state 1.
+
+We say a string is accepted by an NFA if there is some walk that leads to a final state.
+To formalize this, let's define the analagous function $\delta^*$ for an NFA.
+
+$$ \delta^*(q, \epsilon) = \{q\}$$
+
+$$ \delta^*(q, x \cdot w) = \displaystyle\bigcup_{s \in \delta(q, x)} \delta^*(q, w) $$
+
+Then we say that a string $w$ is accepted if $\delta^*(s,w) \cap F \neq \emptyset$; that is, at least one of the states we can reach is a final state.
+Similarly to a DFA, we denote the language of all strings accepting by an NFA $M$ by $L(M)$.
+
+\subsubsection{Remarks}
+
+We want to come up with a more powerful model of computation than DFAs, so we want to recognize languages that a DFA cannot.
+However, we should also make sure that our new model, NFAs, can recognize every language a DFA can!
+Luckily, this is quite easy to see: a DFA **is** an NFA!
+
+To be more precise, every DFA has an equivalent NFA that recognizes the same language.
+If $\delta$ is the transition function for the DFA, define a new NFA with the transition function $\delta'(q, x) =  \delta(q,x) \}$, and keep everything else the same.
+Clearly, this will recognize the same language, though we will soon prove this more formally in Coq.
+
+Some definitions of NFAs include so-called $\epsilon$ transitions: that is, transitions that can be taken without consuming **any** input $\epsilon$ traditionally denotes the empty string).
+Our definition is equivalent.
+While these can make writing NFAs somewhat easier, we choose not to define them that way here because they make definitions more complicated and they also cause issues for some NFA algorithms.
+
+Furthermore, we can see that, given an NFA with $\epsilon$ transitions, we can always generate an equivalent NFA without $\epsilon$ transitions.
+Consider what an $\epsilon$ transition is: if we have an epsilon transition from state $q$ to state $p$, then any time we can reach state $q$, we can also reach state $p$ by following the $\epsilon$ transition.
+That is, if $q \in \delta(r, x)$ for some state $r$, then $p \in \delta(r,x)$ as well.
+Also, if we are in state $q$, and from state $p$ we can reach state $t$ by the symbol $x$, then we can also reach state $t$ from state $q$ with the symbol $x$.
+That is, if $t \in \delta(p, x) $, then $t \in \delta(q, x)$.
+Using these rules, we can see that there is no need to include $\epsilon$ transitions in our definitions; we can simply enlarge the sets of destination states for each state.
+
+\subsection{Coq Definition of NFAs}
+
+Let's now take the time to define these new automata in Coq.
+As you might expect, our basic definition is quite similar to the definition of a DFA, except we change the type of the transition function, which now returns a list.
+While our definition above returns a set, we can easily see this is equivalent, but it turns out to be easier to work with in Coq.
+We also set the types to be implicit arguments to each of the members of our structure for convenience.
+
+\begin{minted}{coq}
+Structure nfa (A B : Type) := {
+  nt : A -> B -> list A;
+  ns : A;
+
+  nF : A -> bool;
+}.
+
+Arguments nt {A} {B}.
+Arguments ns {A} {B}.
+Arguments nF {A} {B}.
+\end{minted}
+
+Note we'll be using some of the DFA lemmas and definitions, so you may wish to write this in the same file.
+Alternatively, we can import the other file by first compiling it:
+
+\begin{minted}{bash}
+$ coqc DFA.v
+\end{minted}
+
+Then importing it in our new file:
+
+\begin{minted}{coq}
+Require Import DFA.
+\end{minted}
+
+We can now define the equivalent of \mintinline{coq}{tStar} for an NFA, which we call \mintinline{coq}{ntStar}, to keep with the theme and distinguish it from the other \mintinline{coq}{tStar} we already have.
+To do so, we'll essentially just replicate the definition given above, with one slight change to account for the fact that we're using lists instead of sets.
+Specifically, we use \mintinline{coq}{flat_map} instead of some \mintinline{coq}{union} function.
+\mintinline{coq}{flat_map} is equivalent to mapping a function \mintinline{coq}{f : A -> list B} over a list, then "flattening" out the list, hence the name.
+In Haskell we have:
+
+\begin{minted}{haskell}
+flat_map = concat . map = concatMap = (=<<)
+\end{minted}
+
+Other than that, it is a routine \mintinline{coq}{Fixpoint} definition:
+
+\begin{minted}{coq}
+Fixpoint ntStar {A B : Type} (M : nfa A B) (q : A) (str : list B) : list A :=
+  match str with
+  | []      => [q]
+  | x :: xs => flat_map (fun st => ntStar M st xs) (nt M q x)
+  end.
+\end{minted}
+
+Our definition of an accepted string must be slightly different to account for \mintinline{coq}{ntStar} returning a list.
+We use the defined function \mintinline{coq}{existsb}, which is the same as \mintinline{coq}{any} from Haskell; essentially, it takes a function and a list, and returns true if there is any element of the list for which the function returns true.
+Therefore, we would have that \mintinline{coq}{existsb is_even [1;2;3] = true} and \mintinline{coq}{existsb [1;7;9] = false}.
+
+\begin{minted}{coq}
+Definition naccepted {A B : Type} (M : nfa A B) (str : list B) : bool :=
+  existsb (nF M) (ntStar M (ns M) str).
+\end{minted}
+
+\subsection{Flat Map Proofs}
+
+We're using several library functions here, so we'll first prove some facts about them, both to learn how to do so, and secondly because we'll need these theorems to prove stuff later.
+This is very similar to what you'll do if you ever try to prove that some program you write (e.g., a compiler) is correct, not in scale though, of course.
+
+We'll prove fours facts about \mintinline{coq}{flat_map} that are hopefully obvious.
+It would be good to take the time to do the proofs yourself just for practice, however.
+
+The first of these is that flat mapping the function which just wraps it's argument in a singleton list is the identity function.
+
+\begin{minted}{coq}
+Lemma flat_map_id :
+  forall {A : Type} (xs : list A), flat_map (fun x => [x]) xs = xs.
+\end{minted}
+
+Next we prove that flat mapping over a list formed by concatenating two other lists is the same as flat mapping over the two lists and then concatenating them.
+Essentially, this is a distributive-style property.
+Again, this is a straightforward induction proof, with a simple application of the \mintinline{coq}{app_assoc} property from the Coq library which says that \mintinline{coq}{a ++ (b ++ c) = (a ++ b) ++ c} for lists \mintinline{coq}{a}, \mintinline{coq}{b}, and \mintinline{coq}{c}.
+
+\begin{minted}{coq}
+Lemma flat_map_app :
+  forall {A B : Type} {f : A -> list B} (xs ys : list A),
+    flat_map f (xs ++ ys) = flat_map f xs ++ flat_map f ys.
+\end{minted}
+
+This next lemma says that there are essentially two ways to flat map two functions successively on a list.
+It's the analogy of the property for functors that \mintinline{coq}{fmap f (fmap g x) = fmap (f . g) x}, or to specialize to lists, that \mintinline{coq}{map f (map g x) = map (f . g) x}.
+Stated another way, we can either do two successively passes over a list with the two functions, or we can just do one pass where we apply both functions.
+Because of the structure of flat map, the statement of it is slightly different, however.
+Using the previous lemma, \mintinline{coq}{flat_map_app}, this becomes a standard induction proof.
+
+\begin{minted}{coq}
+Lemma flat_map_comp :
+  forall {A B C : Type} {f1 : A -> list B} {f2 : B -> list C} (xs : list A),
+    flat_map f2 (flat_map f1 xs) = flat_map (fun x => flat_map f2 (f1 x)) xs.
+\end{minted}
+
+\subsection{NFA Proofs}
+
+In this section, we'll do some fairly straightforward proofs about NFAs, proving an analogy to the \mintinline{coq}{tStar_step} lemma from the previous part and showing that every DFA has an equivalent NFA.
+
+\subsubsection{Step Proof}
+
+Before we had a very useful lemma called \mintinline{coq}{tStar_step}, which essentially made induction possible.
+We want to construct some analogy of that, finding an equivalent expression for the possible states reached by strings $w \cdot x$.
+If we think about, then we can come up with the following statement:
+
+$ \delta^*(q, w \cdot x) = \displaystyle\bigcup_{s \in \delta^*(q, w)} \delta(s, x) $
+
+If you recall back from a few sections ago, where we defined $\delta^*$, this statement is **very** similar to the definition, and hopefully it makes sense.
+Proving this, however, turns out to be quite useful, as it converts the inductive definition from "building" on the front to "building" on the end.
+
+The statement in Coq is as follows.
+Again, we replace the use of a union with \mintinline{coq}{flat_map}.
+
+\begin{minted}{coq}
+Lemma ntStar_step {A B : Type} (M : nfa A B) :
+  forall (str : list B) (x : B) (q : A),
+    ntStar M q (str ++ [x]) = flat_map (fun st => nt M st x) (ntStar M q str).
+Proof.
+induction str.
+\end{minted}
+
+As is standard by now, we proceed by induction on \mintinline{coq}{str}.
+The base case is fairly simple, we need only note that simplifying gives us:
+\begin{minted}{coq}
+flat_map (fun st : A => [st]) (nt M q x) = nt M q x ++ []
+\end{minted}
+
+in the goal.
+This is easily solved by a combination of the property that \mintinline{coq}{xs ++ [] = xs} and the \mintinline{coq}{flat_map_id} lemma from before.
+
+\begin{minted}{coq}
+intuition.
+simpl.
+rewrite app_nil_r.
+apply flat_map_id.
+\end{minted}
+
+The inductive case, however, ends up being a bit trickier.
+At first, we can proceed in a fairly standard fashion, using our \mintinline{coq}{flat_map_comp} and \mintinline{coq}{flat_map_equality} to get the goal to be:
+
+\begin{minted}{coq}
+IHstr : forall (x : B) (q : A),
+        ntStar M q (str ++ [x]) =
+        flat_map (fun st : A => nt M st x) (ntStar M q str)
+x : B
+q : A
+______________________________________(1/1)
+flat_map (fun st : A => ntStar M st (str ++ [x])) (nt M q a) =
+flat_map (fun x0 : A => flat_map (fun st : A => nt M st x) (ntStar M x0 str))
+  (nt M q a)
+\end{minted}
+
+At first glance, this seems quite easy.
+Our inductive hypothesis tells us that for all symbols \mintinline{coq}{x} and states \mintinline{coq}{q}, our inductive hypothesis is true.
+Instinctively we may wish to rewrite "inside" the lambda in on the left hand side of the goal.
+If we could do this, then we would easily finish the proof.
+However, this is impossible in standard Coq.
+
+Doing so is essentially equivalent to the axiom of [functional extensionality](https://ncatlab.org/nlab/show/function+extensionality), which essentially says that, quite reasonably, functions are equal if they have the same value for every input.
+In Coq, this might be:
+
+\begin{minted}{coq}
+Axiom extensionality : forall (A B : Type) (f g : A -> B), (forall (x : A), f x = g x) -> f = g.
+\end{minted}
+
+Unfortunately, while this sounds like a reasonable idea, it cannot be proved in Coq~\cite{coq-axioms}.
+Essentially, the problem is that equality in Coq is syntactic equality: two terms are equal if they were "built" the same way.
+This works quite well for many types: natural numbers, lists, etc.
+But we can't use it to prove functions are equal because they're not, in Coq.
+As shown above, Coq does have support for adding new axioms: essentially, functions that we simply declare exist.
+In this case, adding this axiom causes no issues, because of course the functions are equal for all practical purposes.
+
+However, we can also avoid the need for the axiom, so we prefer to do that instead.
+We can do this by starting *another* induction, this time on \mintinline{coq}{nt M q a}.
+The base case is trivial, and the inductive case can be solved by a combination of the two inductive hypotheses.
+
+\begin{minted}{coq}
+induction (nt M q a).
+intuition.
+simpl.
+now (rewrite IHl, IHstr).
+Qed.
+\end{minted}
+
+The \mintinline{coq}{now} tactic (really a notation) is something new.
+Basically it just means "run this tactic, then try to solve it using \mintinline{coq}{easy}".
+`easy` is similar to \mintinline{coq}{intuition} in that it can solve simple goals for us, so often this can save us a line or two at the end of proofs.
+
+\subsubsection{Building NFA for a DFA}
+
+As discussed earlier, to build an NFA that is equivalent to a DFA, we need only convert the transition function so that it returns a singleton of a state instead of a list.
+This can be implemented as follows:
+
+\begin{minted}{coq}
+Definition dfa_to_nfa {A B : Type} (M : dfa A B) : nfa A B :=
+  Build_nfa A B (fun st x => [t M st x]) (s M) (F M).
+\end{minted}
+
+\paragraph{Mirroring Proof}
+
+As usual, we start by proving a "mirroring" property, essentially stating that our transition function behaves just like a DFA's transition function, with always a single destination state, except that it is wrapped in a list.
+
+\begin{minted}{coq}
+Lemma dfa_to_nfa_mirror {A B : Type} (M : dfa A B) :
+  forall (str : list B), [tStar M (s M) str] = ntStar (dfa_to_nfa M) (ns (dfa_to_nfa M)) str.
+Proof.
+apply rev_ind.
+intuition.
+\end{minted}
+
+We use \mintinline{coq}{rev_ind} for "reverse" induction: building the string up by appending, rather than prepending, as usual.
+The base case is trivial.
+The inductive case's goal is:
+
+\begin{minted}{coq}
+H : [tStar M (s M) l] = ntStar (dfa_to_nfa M) (ns (dfa_to_nfa M)) l
+______________________________________(1/1)
+[tStar M (s M) (l ++ [x])] =
+ntStar (dfa_to_nfa M) (ns (dfa_to_nfa M)) (l ++ [x])
+\end{minted}
+
+We can apply both \mintinline{coq}{tStar_step} and \mintinline{coq}{ntStar_step} to get the goal into a form that works with our inductive hypothesis.
+Finally, we can solve it with the hypothesis, \mintinline{coq}{H}.
+Below I've combine all these rewrites for brevity.
+
+\begin{minted}{coq}
+intuition.
+now (rewrite tStar_step, ntStar_step, <- H).
+Qed.
+\end{minted}
+
+\paragraph{Correctness Proof}
+
+Now we can prove correctness of this NFA: it accepts precisely the strings that the original DFA did.
+In Coq, we write:
+
+\begin{minted}{coq}
+Theorem dfa_to_nfa_correct :
+  forall {A B : Type} (M : dfa A B) (str : list B),
+    accepted M str = true <-> naccepted (dfa_to_nfa M) str = true.
+Proof.
+\end{minted}
+
+Both directions are fairly similar, so I'll only do the forward direction here.
+We wish to show:
+
+\begin{minted}{coq}
+H : accepted M str = true
+______________________________________(1/2)
+naccepted (dfa_to_nfa M) str = true
+\end{minted}
+
+Unfolding the definitions of \mintinline{coq}{accepted} and \mintinline{coq}{naccepted} make this far less opaque:
+
+\begin{minted}{coq}
+H : F M (tStar M (s M) str) = true
+______________________________________(1/2)
+existsb (nF (dfa_to_nfa M)) (ntStar (dfa_to_nfa M) (ns (dfa_to_nfa M)) str) =
+true
+\end{minted}
+
+In fact, by using our \mintinline{coq}{dfa_to_nfa_mirror} property, we can solve this quite easily, because we know the list we are checking with \mintinline{coq}{existsb} is a singleton.
+
+\begin{minted}{coq}
+unfold accepted in H.
+unfold naccepted.
+rewrite <- dfa_to_nfa_mirror.
+simpl.
+now (rewrite H).
+\end{minted}
+
+\subsection{Equivalency Proof}
+
+Now we should discuss our original objective with defining NFAs: to create a more powerful model of computation.
+It may seem like we have: DFAs are definitely not more powerful than NFAs, and NFAs can often produce smaller automata.
+
+However, it is not the case.
+In fact, every NFA also has an equivalent DFA: that is, the languages that NFAs can recognize are exactly the same as the languages that DFAs can recognize.
+
+How do we see this?
+Constructively, of course!
+Given an NFA, how do we create an DFA that recognizes the same language?
+
+We use what is called the \textit{powerset construction}.
+Essentially, our states will be sets of states, rather than "single values", as we have shown before.
+
+Let's start defining the DFA $M = (Q_M, \Sigma, \delta_M, s_M, F_M)$, given an NFA $N = (Q, \Sigma, \delta, s, F)$.
+Starting with the easiest parts:
+
+The alphabet is the same, as expected.
+The start state is just the singleton containing the original start state: $s_M = \{s\}$.
+As I stated, our states are sets of states.
+To be safe, we'll throw every single possible set of states in (i.e., the powerset, hence the name), though this is often unnecessary (we'll discuss DFA minimization later).
+So $Q_M = \mathcal{P}(Q)$.
+Recalling that our states are sets, our final states are those which containg at least one final state from the original NFA:
+
+$$F_M := \{ \mathcal{S} \in Q_M : \mathcal{S} \cap F \neq \emptyset \}$$
+
+Finally, the transition function is as follows: $\delta_M(q, x) = \displaystyle\bigcup_{s \in q} \delta(s,x) $
+
+Note that, even though the output of this function is a set of states, this is still a DFA, because our states are themselves sets of states.
+
+\paragraph{Definitions}
+
+Let's now prove that this really works.
+
+The first step, as always, is to define everything in Coq.
+The definitions follow the above, so I won't say too much, except that to note that we again use lists instead of sets, and use \mintinline{coq}{flat_map} in place of unioning.
+Note the similarilty between these definitions and the definitions we gave earlier of an NFA and what it means to be accepted.
+
+\begin{minted}{coq}
+Definition powerset_nfa_trans {A B : Type} (M : nfa A B) (possible : list A) (x : B) : list A :=
+    flat_map (fun source => nt M source x) possible.
+
+Definition powerset_nfa_f {A B : Type} (M : nfa A B) (possible : list A) : bool :=
+    existsb (nF M) possible.
+
+Definition powerset_nfa {A B : Type} (M : nfa A B) : dfa (list A) B :=
+    Build_dfa (list A) B (powerset_nfa_trans M) [ns M] (powerset_nfa_f M).
+\end{minted}
+
+\paragraph{Mirroring Proof}
+
+We can now prove the version of mirroring property that we will need for this construction, which is:
+
+$\delta_M^*(q, w) = \delta^*(q, w)$
+
+In Coq, this becomes:
+
+\begin{minted}{coq}
+Lemma powerset_nfa_mirror {A B : Type} (M : nfa A B) :
+    forall (str : list B),
+      tStar (powerset_nfa M) (s (powerset_nfa M)) str = ntStar M (ns M) str.
+Proof.
+apply rev_ind.
+\end{minted}
+
+There is one particularly interesting thing about this statement, which is that it's actually much stronger than the mathematical statement we wrote.
+Specifically, for the lists to be equal, they must not only have the same elements, but also in the same order.
+Luckily for us, it's still true, and this is the easier way to prove things when using lists.
+
+We proceed by \mintinline{coq}{rev_ind} as shown above, and the base case is trivial.
+After using \mintinline{coq}{tStar_step} and \mintinline{coq}{ntStar_step}, we end up with:
+
+\begin{minted}{coq}
+H : tStar (powerset_nfa M) (s (powerset_nfa M)) l = ntStar M (ns M) l
+______________________________________(1/1)
+powerset_nfa_trans M (tStar (powerset_nfa M) [ns M] l) x =
+flat_map (fun st : A => nt M st x) (ntStar M (ns M) l)
+\end{minted}
+
+Though it's not immediately obvious how to prove this, by unfolding the definition of \mintinline{coq}{powerset_nfa_trans}, it becomes clear.
+The proof is below:
+
+\begin{minted}{coq}
+intuition. (* For the base case *)
+
+intuition.
+rewrite tStar_step, ntStar_step.
+simpl.
+unfold powerset_nfa_trans.
+now (rewrite <- H).
+Qed.
+\end{minted}
+
+\paragraph{Correctness Proof}
+
+The correctness proof is similar to those we've done before, so I'll only do the first direction, as before.
+
+The statement of the theorem is:
+
+\begin{minted}{coq}
+Theorem powerset_nfa_correct :
+  forall {A B : Type} (M : nfa A B) (str : list B),
+    accepted (powerset_nfa M) str = true <-> naccepted M str = true.
+Proof.
+intuition.
+\end{minted}
+
+By unfolding the definitions of \mintinline{coq}{accepted} and \mintinline{coq}{naccepted}, we get:
+
+\begin{minted}{coq}
+H : powerset_nfa_f M (tStar (powerset_nfa M) [ns M] str) = true
+______________________________________(1/2)
+existsb (nF M) (ntStar M (ns M) str) = true
+\end{minted}
+
+Using the mirroring property gives:
+
+\begin{minted}{coq}
+H : powerset_nfa_f M (ntStar M (ns M) str) = true
+______________________________________(1/2)
+existsb (nF M) (ntStar M (ns M) str) = true
+\end{minted}
+
+Now that these two things actually have the same definition, so Coq can finish this for us if we use \mintinline{coq}{now}.
+The proof of the forward direction is therefore:
+
+\begin{minted}{coq}
+unfold accepted in H.
+simpl in H.
+unfold naccepted.
+now (rewrite (powerset_nfa_mirror M) in H).
+\end{minted}
+
+\subsection{Conclusion}
+
+We have defined a new model of computation, called an NFA, which is equivalent to DFAs.
+However, they still have their uses.
+Though we won't prove this, NFAs can be exponentially smaller than the equivalent DFA.
+Intuitively, this should make sense: the powerset construction gives us a DFA with $2^n$ states, where the original NFA had $n$ states.
+
+Not only this, but in practice it's often easier to come up with an NFA that recognizes a given language than to come up with a DFA.
+Then we can simply invoke the powerset construction to get a DFA.
+Though we have yet to talk about performance, the current methods for things are somewhat inefficient, especially if we just keep building larger and larger DFAs.
+Later, we'll talk about minimizing DFAs to make some of this more computationally feasible.
+
+In the next couple parts, we'll talk about proof automation, to make the proof writing process less tedious, and then we'll discuss regular expressions and their relation to NFAs and DFAs.
+

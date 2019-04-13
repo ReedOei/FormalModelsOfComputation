@@ -1,0 +1,467 @@
+\section{Strings}
+
+\subsection{Definining Strings}
+
+We will define strings inductively, because it's the most natural way to do it.
+In fact, we will actually going to define lists, not strings, but the two behave very similarly, at least for the purposes of this article.
+
+\begin{minted}{coq}
+Inductive list (A : Type) : Type :=
+    | nil : list A
+    | cons : A -> list A -> list A
+\end{minted}
+
+This is actually already defined for us in Coq, so we'll just use the following lines to import it (and some nicer notation):
+
+\begin{minted}{coq}
+Require Import List.
+
+Import ListNotation.
+\end{minted}
+
+The new notation essentially gives us the following equivalences (note the below is not valid Coq code):
+
+\begin{minted}{coq}
+[] = nil
+x :: xs = cons x xs
+\end{minted}
+
+Similarly, we also want to use natural numbers (defined as follows), because we care about the length of our strings, and the length of a list is well-represented by a natural number.
+
+\begin{minted}{coq}
+Inductive nat : Type :=
+    | O : nat (* note this is the letter O, not the number 0 *)
+    | S : nat -> nat
+\end{minted}
+
+Similar to above, we import a module to gain access to definitions, and, more importantly, proofs of obvious properties of natural numbers, like commutativity of addition.
+Without these proofs, it's a pain to work with any numbers because of the sheer quantity of seemingly "obvious" statements about natural numbers that we take for granted, such as associativity or commutativity of addition.
+
+\begin{minted}{coq}
+Require Import PeanoNat.
+\end{minted}
+
+Finally, we define an arbitrary type, which essentially functions as the alphabet for our strings.
+That is, each "letter" (element) of our string (list) is a value of type \mintinline{coq}{A}.
+
+\begin{minted}{coq}
+Variable A : Type.
+\end{minted}
+
+\subsection{Basic String Operations}
+
+Let's now define some basic operations: length, concatenation, and reversals.
+
+Each of these definitions will be recursive, so we'll use the \mintinline{coq}{Fixpoint} keyword to indicate this to Coq.
+Note that Coq requires *structural recursion*, which ensures that all our functions will terminate.
+Basically, structural recursion means that you can only do recursive calls on "smaller" values: if someone calls $f(n)$, you can recursively call $f(n-1)$, but not $f(n+1)$.
+Without this, nonterminating functions may be used to prove *anything*, which is not really what we want.
+We lose Turing completeness like this, but as you'll see, we can still prove plenty of things.
+
+\subsubsection{Length}
+
+The first operation to define is the length of a string.
+As you will see is quite common, we define the function for each *case* or *constructor* of the type we are recursing on; in this case, we are recursing on a list, so we need to cover both the empty list and the non-empty list.
+Doing this, we can define that a list has a length whose value is given by:
+
+\begin{minted}{coq}
+Fixpoint length (s : list A) : nat :=
+    match s with
+    | []      => 0
+    | _ :: xs => 1 + length xs
+    end.
+\end{minted}
+
+That is, if we have the empty string, [] (or, mathematically $\epsilon$), then it's length is just 0.
+Otherwise, if we have some symbol followed by a string $xs$, the total length is simply one greater than the length of $xs$.
+Note that when we don't care about the value of a particular variable, in this case, the first symbol in the string, we can simply write an underscore to indicate that we don't care.
+This is good practice because it's a hint to whoever is reading our definitions that they can mentally ignore that part altogether.
+
+\subsubsection{Concatenation}
+
+This operation will take two strings, "hello " and "world" and join them into "hello world".
+You are probably already familiar with this operation, but may not have seen the recursive definition before.
+Similar to above, we define it both for the case where \mintinline{coq}{a} is the empty list, and when it is not empty.
+While recursive definitions like this may seem confusing, they actually make the proofs much more natural.
+
+\begin{minted}{coq}
+Fixpoint concat (a b : list A) : list A :=
+    match a with
+    | []      => b
+    | x :: xs => x :: concat xs b
+    end.
+\end{minted}
+
+Note that, even though there are two strings, we still only recurse on one of them, specifically, the first one, \mintinline{coq}{a}.
+We also introduce new notation to make our lives easier (this line allows us to write \mintinline{coq}{x ++ y} instead of \mintinline{coq}{concat x y})):
+
+\begin{minted}{coq}
+Notation "x ++ y" := (concat x y).
+\end{minted}
+
+\subsubsection{Reversing}
+
+Finally, the reversal of a string.
+This definition is not computationally the most efficient (given our concatenation definition, it has to traverse the entire list to append the element to the end.
+We could fairly easily write a $O(n)$ version using an accumulator, but this definition is not only simpler to state, but it's also equivalent to the other definition.
+More importantly, given that we're just interested in it for proof purposes (for the moment, at least), we only care that it works and that it's easy to prove theorems with it.
+In this case, both criteria are satisfied, so we're good.
+
+\begin{minted}{coq}
+Fixpoint reverse (s : list A) : list A :=
+    match s with
+    | []      => []
+    | x :: xs => reverse xs ++ [x]
+    end.
+\end{minted}
+
+As before, we handle the case of the empty list and non-empty list separately.
+Reversing an empty list has no effect.
+Reversing a non-empty list simply takes the first element, reverses the rest of the elements, and places this first element at the end of the list.
+If you are unsure of how this definition (or any of the preceding definitions) works, you should stop and take the time to figure them out.
+
+\subsection{Proving Basic String Properties}
+
+\subsubsection{Empty String is Concatenation Identity}
+
+The first of these is that the empty string, $\epsilon$ functions as a right identity for concatentation (it is already a left identity by definition).
+We write the following lines, which put us into Coq's interactive proof evironment.
+Here we use a set of *proof tactics* which take our current propositions and transform them until we can apply axioms to finish the proof.
+
+\begin{minted}{coq}
+Lemma concat_empty_string_id : forall (s : list A), s ++ [] = s.
+Proof.
+\end{minted}
+
+After this line, the goals we have are:
+
+\begin{minted}{coq}
+forall (s : list A), s ++ [] = s.
+\end{minted}
+
+This is exactly what we wrote, and to start the proof, we must *introduce* variables, so that we can talk about the variables in our hypothesis.
+In this case, we have only one variable, \mintinline{coq}{s}.
+Continuing the idea that proofs are functions, we can think of this variable as a parameter to the function, \mintinline{coq}{concat_empty_string_id}`
+To add this to our goals, we can write:
+
+\begin{minted}{coq}
+intro s.
+\end{minted}
+
+Now we have:
+
+\begin{minted}{coq}
+1 subgoal
+s : list A
+______________________________________(1/1)
+s ++ [] = s
+\end{minted}
+
+Above the bar is our hypotheses, and below the line is what we are trying to prove.
+This means we are trying to prove, for some arbitrary list \mintinline{coq}{s}, that \mintinline{coq}{s ++ [] = s}.
+We will do so by structural induction on the list (this is one of the things defined for us in the \mintinline{coq}{List} module).
+Again, going back to programming, this is like case anaylsis: if the list is empty, then we our function.
+Otherwise, if the list is not empty, we write our function by recursively calling our function on the smaller list.
+To use induction, we simply write:
+
+\begin{minted}{coq}
+induction s.
+\end{minted}
+
+Now we get:
+
+\begin{minted}{coq}
+2 subgoals
+______________________________________(1/2)
+[] ++ [] = []
+______________________________________(2/2)
+(a :: s) ++ [] = a :: s
+\end{minted}
+
+This means that we have two *subgoals* to prove: the base case, when the list is empty, and the inductive case, when it is not.
+In this inductive case, we know that the list of is of the form \mintinline{coq}{a :: s}, that is, there is some element, \mintinline{coq}{a}, followed by possibly many more characters, that is, another string, called \mintinline{coq}{s}.
+
+By default, we prove the subgoals in order, though it is possible to switch the order if you really need to.
+In this case (and most), the default order works well.
+Thinking about what the first subgoal is saying, \mintinline{coq}{[] ++ [] = []}, we know that it is quite obviously that this is true---but we must still provide a proof.
+Luckily, simply by definition (in the first case), we can see that the left hand side reduces to \mintinline{coq}{[]} (this is the base case in our definition of the \mintinline{coq}{++} operation).
+In Coq, to apply function definitions, we can use the \mintinline{coq}{simpl} tactic, like so:
+
+\begin{minted}{coq}
+simpl.
+\end{minted}
+
+Now we are left with:
+
+\begin{minted}{coq}
+2 subgoals
+______________________________________(1/2)
+[] = []
+______________________________________(2/2)
+(a :: s) ++ [] = a :: s
+\end{minted}
+
+Whenever you see the same thing on both sides of the equality, you can use the \mintinline{coq}{reflexivity} tactic to prove your goal, since the proposition is true by reflexivity.
+So we end the proof of this case with:
+
+\begin{minted}{coq}
+reflexivity.
+\end{minted}
+
+This resolves the first subgoal, and now we are left with:
+
+\begin{minted}{coq}
+1 subgoal
+a : A
+s : list A
+IHs : s ++ [] = s
+______________________________________(1/1)
+(a :: s) ++ [] = a :: s
+\end{minted}
+
+This looks considerably more complicated, so let's consider each part on it's own.
+By doing induction, we've handle the case of the empty string, so now we just need to handle the case that the string is not empty, that is, it starts with some symbol \mintinline{coq}{a} and ends in a string \mintinline{coq}{s}.
+The part below the line is simply the thing we are trying to prove, \mintinline{coq}{x ++ [] = x}, but with \mintinline{coq}{a :: s} instead of \mintinline{coq}{x}.
+Finally, \mintinline{coq}{IHs} is the inductive hypothesis, which tells us that the lemma is true for smaller list, \mintinline{coq}{s}.
+
+Usually, if we have an equality, we will want to make a substitution in our goal, either substituting the left hand side for the right, or vice versa.
+However, in this case, substitution doesn't seem to help us, as the only way we can substitute, the right hand side for the left, only serves to complicate the equation.
+Instead, we want to simplify the equation first.
+It's often a good idea to simplify your equation whenever you can, and in this case, we can apply the second case in our \mintinline{coq}{concat} function (via the \mintinline{coq}{simpl} tactic) to simplify this as follows.
+
+\begin{minted}{coq}
+1 subgoal
+a : A
+s : list A
+IHs : s ++ [] = s
+______________________________________(1/1)
+a :: (s ++ []) = a :: s
+\end{minted}
+
+I have added the parentheses myself for clarity.
+Now we can use the inductive hypothesis, \mintinline{coq}{IHs} to replace \mintinline{coq}{s ++ []} with  \mintinline{coq}{s}.
+To do so, we use the \mintinline{coq}{rewrite} tactic, like so:
+
+\begin{minted}{coq}
+rewrite IHs.
+\end{minted}
+
+Note that to substitute the right hand side for the left, that is, to substitute \mintinline{coq}{s ++ []} for \mintinline{coq}{s}, we would write:
+
+\begin{minted}{coq}
+rewrite <- IHs.
+\end{minted}
+
+After rewriting, we have:
+
+\begin{minted}{coq}
+1 subgoal
+a : A
+s : list A
+IHs : s ++ [] = s
+______________________________________(1/1)
+a :: s = a :: s
+\end{minted}
+
+Now we have an equality with both sides the same, and we can finish the proof with an application of \mintinline{coq}{reflexivity}.
+When you see:
+
+\begin{minted}{coq}
+No more subgoals.
+\end{minted}
+
+When you see this, you can finish the proof with:
+
+\begin{minted}{coq}
+Qed.
+\end{minted}
+
+The entire proof is shown below, with the tactics for each induction subgoal on the same line:
+
+\begin{minted}{coq}
+Lemma concat_empty_string_id : forall (s : list A), s ++ [] = s.
+Proof.
+intuition.
+induction s.
+simpl. reflexivity. (* empty list case *)
+simpl. rewrite IHs. reflexivity. (* non-empty list (inductive) case *)
+Qed.
+\end{minted}
+
+The rest of the proofs will be done in far less detail.
+
+\subsubsection{Length with Concatenation}
+
+The next lemma is that the length of \mintinline{coq}{x} concatenated with \mintinline{coq}{y}, is the length of \mintinline{coq}{x} added to the length of \mintinline{coq}{y}.
+In Coq we write:
+
+\begin{minted}{coq}
+Lemma length_concat : forall (a b : list A), length (a ++ b) = length a + length b.
+\end{minted}
+
+The proof is nearly identical to the first proof we did, except that we only do induction on \mintinline{coq}{a}.
+This makes sense, given that concatenation is defined recursively only on the first argument.
+We begin as we did before:
+
+\begin{minted}{coq}
+Proof.
+intros a b.
+induction a.
+\end{minted}
+
+The base case is again obvious by simplification:
+
+\begin{minted}{coq}
+simpl. reflexivity.
+\end{minted}
+
+The other case is proved similarly:
+
+\begin{minted}{coq}
+simpl. rewrite IHa. reflexivity.
+\end{minted}
+
+Note that we use \mintinline{coq}{IHa} rather than \mintinline{coq}{IHs}, because we did induction on \mintinline{coq}{a}, rather than \mintinline{coq}{s}.
+Had we named our variables differently, the inductive hypothesis will have a different name.
+
+\subsubsection{Concatenation is Associative}
+
+This lemma is an important fact that is very useful for proving things, as well as essentially finishing the proof that strings form a monoid under concatenation.
+In Coq:
+
+\begin{minted}{coq}
+Lemma concat_assoc : forall (a b c : list A), a ++ (b ++ c) = (a ++ b) ++ c.
+\end{minted}
+
+The proof is identical to the previous two (but you should still do it!).
+
+\subsection{Various String Lemmas}
+
+In this section we continue to prove several more lemmas involving the definitions and lemmas above.
+
+\subsubsection{Reversing a string doesn't change it's length}
+
+\begin{minted}{coq}
+Lemma length_reverse : forall (s : list A), length s = length (reverse s).
+\end{minted}
+
+This proof will require slightly more effort, though we begin with induction just like the other proofs.
+In particular, we'll need the use of a lemma from above and the fact that addition is commutative for natural number.
+Beginning by induction, the base case is trivial because the length of an empty string is 0 by definition, and the reversal of an empty string is also an empty string.
+
+\begin{minted}{coq}
+intros s.
+induction s.
+simpl. reflexivity.
+\end{minted}
+
+Our inductive case is now to show (after a simplification):
+
+\begin{minted}{coq}
+S (length s) = length (reverse s ++ [a])
+\end{minted}
+
+S denotes the successor function, so our goal is $1 + |s| = |s^R \cdot a|$, where $s^R$ is the reverse of $s$.
+Luckily, we have a lemma from above that allows us to simplify the right hand side (that is, $|x \cdot y| = |x| + |y|$.
+We can apply it like so, and then applying the inductive hypothesis almost finishes the proof.
+
+\begin{minted}{coq}
+rewrite length_concat.
+simpl.
+rewrite IHs.
+\end{minted}
+
+The final step we need is to rewrite $|s^R| + 1$ as $1 + |s^R|$, which can be accomplished by a built-in theorem, imported from \mintinline{coq}{PeanoNat}.
+This property is simply commutativity of addition, and is appropriately named \mintinline{coq}{Nat.add_comm}.
+After application, simplification finishes the proof for us:
+
+\begin{minted}{coq}
+rewrite Nat.add_comm.
+simpl.
+reflexivity.
+Qed.
+\end{minted}
+
+\subsubsection{Reversing Concatentation}
+
+\begin{minted}{coq}
+Lemma reverse_concat : forall (a b : list A), reverse (a ++ b) = reverse b ++ reverse a.
+\end{minted}
+
+As all the other proofs in this article, we begin via induction:
+
+\begin{minted}{coq}
+intros a b.
+induction a.
+simpl.
+\end{minted}
+
+This time, however, the base case is not as trivial.
+We must show $b^R = b^R \cdot \epsilon$, which is obviously true, but is not evident from the definition.
+Luckily, we proved this earlier, so we can reuse our proof, which finishes up this case:
+
+\begin{minted}{coq}
+rewrite concat_empty_string_id.
+reflexivity.
+\end{minted}
+
+For the inductive step, we immediately simplify and use the inductive hypothesis.
+This makes our goal into:
+
+\begin{minted}{coq}
+(reverse b ++ reverse a0) ++ [a] = reverse b ++ reverse a0 ++ [a]
+\end{minted}
+
+The only difference here is the grouping---luckily we proved that concatenation is associative earlier, so here we simply use it:
+
+\begin{minted}{coq}
+rewrite <- concat_assoc.
+reflexivity.
+Qed.
+\end{minted}
+
+Note that we rewrite the "opposite" way: replacing the right hand side with the left, so we use an arrow <-.
+This finishes our proof.
+
+\subsubsection{Reversing a reversed string gives the original string}
+
+\begin{minted}{coq}
+Lemma reverse_reverse_id : forall (s : list A), reverse (reverse s) = s.
+\end{minted}
+
+Again, we proceed by induction.
+Here the base case is trivial, as it all simplifies by simple application of the definitions:
+
+\begin{minted}{coq}
+intros s.
+induction s.
+simpl. reflexivity.
+\end{minted}
+
+The inductive case is also relatively straightforward with an application of the previous theorem, followed by the use of the inductive hypothesis.
+
+\begin{minted}{coq}
+simpl.
+rewrite reverse_concat.
+simpl.
+rewrite IHs.
+reflexivity.
+Qed.
+\end{minted}
+
+\subsubsection{Proof Simpliciation with Intuition}
+
+As a parting note, the tactic \mintinline{coq}{intuition} can often simplify multiple steps at a time, as well as serving to introduce variables and hypotheses.
+So we can rewrite the first proof we did as, though in this case, it provides only a minor benefit:
+\begin{minted}{coq}
+Lemma concat_empty_string_id : forall (s : list A), s ++ [] = s.
+Proof.
+intuition.
+induction s.
+intuition.
+simpl. rewrite IHs. reflexivity.
+Qed.
+\end{minted}
+
+Also, note that while we wrote our proofs using proof tactics with the interactive proving environment, we can also write proofs as normal functions (it just takes more work).
+

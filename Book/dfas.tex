@@ -1,0 +1,641 @@
+\section{Deterministic Finite Automata}
+
+In the previous section, we discussed working with Coq and strings/lists.
+This time we'll move onto defining and proving some interesting theorems about one of the simplest models of computation: deterministic finite automata, often abbreviated DFAs.
+
+\subsection{What is computation?}
+
+But before we do that, we discuss what we mean by "computation."
+
+One of the simplest definitions, and the one that we'll be using, at least for now, is the following:
+
+*Computation* is the process of determining whether a string is in a language or not.
+
+This raises many more questions, such as "what is a language?", and the more fundamental "what does 'determining' mean?", both of which are indeed very important and will be addressed shortly.
+First, however, we will try to give some intuition into why this is a useful definition of computation.
+
+Let's consider some simple computational problem, namely: Given a string $w$, does it have an even or odd number of characters?
+Because this is a boolean decision, we can simply the problem a little more: Given a string $w$, does it have an even number of characters?
+Clearly this requires some computation to check.
+In your favorite programming language (which is Haskell, of course), we could solve this problem as follows:
+
+\begin{minted}{haskell}
+evenLen str = length str \mintinline{coq}{mod} 2 == 0
+\end{minted}
+
+This definition is concise and familiar to any programmer, but it requires the definition of several more terms, and is therefore harder to prove theorems about.
+Therefore, it's sometimes preferable define \mintinline{coq}{evenLen} as follows:
+
+\begin{minted}{haskell}
+evenLen ""       = True
+evenLen [_]      = False
+evenLen (_:_:xs) = evenLen xs
+\end{minted}
+
+Professional programmers might be offended by the runtime, but we can prove the two definitons are equivalent and that's all we care about at the moment.
+
+But there are other computational problems that don't seem to fit this mold.
+For example, one of the most basic computations: compute $\text{inc}(x) = x + 1$ for any $x$.
+But take a step back: this is still a string recognition problem!
+Just think about it as a string, instead of an expression.
+For example, "f(2) = 3" is a valid string, but "f(4) = -1" is not.
+How would we check this?
+Well, one way would be as follows:
+
+\begin{minted}{haskell}
+incString x str = str == ("f(" ++ show x ++ ") = " ++ show (x + 1))
+\end{minted}
+
+You can imagine that any algorithm that recognizes this language must somehow "do addition" in the background.
+
+Now we have some intuitive sense of what computation is, but no sense of what the "rules" are, so to speak.
+Clearly there are some things we can compute, and there are things we can't compute.
+For example, as you may know, most real numbers are \reed{cite}.
+But without defining precisely what a computation is allowed to do, it's quite difficult to say whether a given language is computable or not.
+
+\subsection{Definitions}
+
+Now let's actually define what we mean by "language" and define the first model of computation, DFAs.
+
+Defining a language is quite simple: a *language* is a set of *strings*.
+Note a language may be empty, and also may be infinite: in fact, infinite languages are generally much more interesting that finite languages.
+Any finite language is, from a purely mathematical standpoint, trivial to compute: given a string, we can just iterate through each string in the language and check, because the language is finite.
+
+Now let's talk about DFAs.
+Here is an example of a DFA:
+
+% <img src="http://reedoei.com/files/dfa-example.svg" style="width: 50%; height: 50%">
+
+DFAs, also sometimes called state machines, are a very simple model of computation, which are generally draw as directed graphs.
+The nodes are called *states* and the edges are called *transitions*.
+One of the states is designated as a *start state*, and some possibly empty subset of the states are *final* or *accepting* states, indicated by two concentric circles.
+
+To process an input string, you start at the start state, the move through the string, one character at a time, following the transition labeled with the current character.
+If the state you end up in when you are done processing the string is a final state, then the string is said to be *accepted*.
+
+For example, the DFA above will accepted the string "abab": we start in state 0, then follow the arrow for "a" to state 1, the arrow for "b" to 0, the arrow for "a" to 1, and finally the arrow for "b" to "0", which has two circles, indicating it is a final state.
+Note that this DFA will reject the string "aa": we start in state 0, then follow the arrow for "a" to state 1, and then the arrow for "a" to state 2, which is not a final state.
+This DFA accepts strings that look like "abababababab...", and rejects everything else.
+
+Formally, we define a DFA $M$ as a five-tuple: $Q, \\Sigma, \\delta, s, F$, where:
+- $Q$ is the set of states. Note that this set must be **finite** (hence deterministic **finite** automaton).
+- $\Sigma$ is the *alphabet*, or the set of characters that are allowed to appear in the input strings. This is often omitted when it is obviously from the context.
+- $\delta : Q \times \Sigma \rightarrow Q$ is the transition function, which tells you, given a state and a character, what the next state should be. For example, in the DFA above, we have $\delta(0, a) = 1$ and $\delta(1, b) = 0$.
+- $s \in Q$ is the start state.
+- $F \subseteq Q$ is the set of final states.
+
+Finally, for convenience we define the function $\delta^* : Q \times \Sigma^* \rightarrow Q$ as follows.
+Note that $ \Sigma^* $ is the set of all (finite) strings that can be formed from the alphabet, or set of symbols, $ \Sigma $.
+
+$ \delta^*(q, \epsilon) = q $
+
+$ \delta^*(q, x \cdot w) = \delta^*(\delta(q, x), w)$
+
+where $x \cdot w$ denote the string formed by the symbol $x$ followed by the string $w$.
+Essentially, this function performs the same function as $\delta$, but for a whole string.
+
+Finally, we say a string $w$ is *accepted* by a DFA $M$ if $\delta^*(s, w) \in F$.
+The language defined by $M$ is the set of strings accepted by $M$, and is defined as follows:
+
+$L(M) := \{ w \in \Sigma^* : w \text{ is accepted by } M\}$
+
+We say a language $L$ is recognized by a DFA $M$ if $L = L(M)$, and naturally that a language $L$ can be recognized by a DFA if $L = L(M)$ for some DFA $M$.
+
+\subsection{Coq Definitions}
+
+So how do we define these concepts in Coq?
+
+First, let's start by considering how to define a set.
+We could define a set as a list, then define equality that doesn't care about order, and proceed in a standard set theoretic way.
+
+However, there's a far simpler definition: types and sets are very similar in many ways.
+While there are differences, we don't need to concern ourselves with those now.
+Both have values which are "members" of them, for sets, with the relation $x \in A$ and for types with the relation $x : A$.
+This is the property that we care about, so we'll call a type a "set" for now.
+In the future, we will need to restrict our definition to only allow finite sets.
+
+\subsubsection{Defining a DFA}
+
+So to define a DFA we need a set $Q$, a set $\Sigma$, a function $\delta$, which we'll call \mintinline{coq}{t}, for **t**ransition, a start state $s$, and a set of final states $F$.
+We said that sets will be represented by types, so we'll let $Q$ and $\Sigma$ each be the types \mintinline{coq}{A} and \mintinline{coq}{B}, respectively.
+Coq has support for functions, so we'll have a function \mintinline{coq}{t : A -> B -> A} (the curried version of \mintinline{coq}{t : A * B -> A} where \mintinline{coq}{A * B} denotes the type of pairs of values of type \mintinline{coq}{A} and \mintinline{coq}{B}.
+The start state is simply some value of type \mintinline{coq}{A}, so \mintinline{coq}{s : A}.
+Finally, we have the set of final states.
+While this is a set, it's not just any set---it's a subset of \mintinline{coq}{A}.
+We'll represent this by a function \mintinline{coq}{F : A -> bool}.
+If \mintinline{coq}{F q} is a true, then \mintinline{coq}{q} is a final state, otherwise \mintinline{coq}{q} is not a final state.
+Putting this all together we get:
+
+\begin{minted}{coq}
+Structure dfa (A B : Type) := {
+  t : A -> B -> A;
+  s : A;
+
+  F : A -> bool;
+}.
+\end{minted}
+
+Here we have defined a *structure*, which is essentially just a record, or a product type with named projections.
+Note that it is parameterized over the types representing the set of states $Q$ and the alphabet $\Sigma$.
+
+To access some part of a dfa \mintinline{coq}{M : dfa A B}, for example, the start state, we can write \mintinline{coq}{t A B M}.
+It is quite tedious to always write the types \mintinline{coq}{A} and \mintinline{coq}{B}, and they can be easily inferred from the fact that \mintinline{coq}{M} is one of the parameters.
+Therefore, we make use of \mintinline{coq}{Arguments} command to make the types \mintinline{coq}{A} and \mintinline{coq}{B} implicit parameters:
+
+\begin{minted}{coq}
+Arguments t {A} {B}.
+Arguments s {A} {B}.
+Arguments F {A} {B}.
+\end{minted}
+
+\subsubsection{Defining languages}
+
+We now with to define $\delta^*$, which we'll call \mintinline{coq}{tStar}, and the language $L(M)$.
+Note that \mintinline{coq}{tStar} has a nice recursive definition, so we'll define it as a \mintinline{coq}{Fixpoint}, similar to how we defined some functions last time
+
+\begin{minted}{coq}
+Fixpoint tStar {A B : Type} (M : dfa A B) (q : A) (str : list B) : A :=
+  match str with
+  | []      => q
+  | x :: xs => tStar M (t M q x) xs
+  end.
+\end{minted}
+
+Note that we make \mintinline{coq}{A} and \mintinline{coq}{B} implicit parameters of this function as well, by writing them inside the curly brackets, \mintinline{coq}{{}}.
+
+We define whether a string \mintinline{coq}{str} is accepted by a DFA \mintinline{coq}{M} is accepted by using the function \mintinline{coq}{tStar} and the function \mintinline{coq}{F} defined for every DFA as follows:
+
+\begin{minted}{coq}
+Definition accepted {A B : Type} (M : dfa A B) (str : list B) : bool :=
+  F M (tStar M (s M) str).
+\end{minted}
+
+Then the language defined by \mintinline{coq}{M} is all \mintinline{coq}{str : list B} such that \mintinline{coq}{accepted M str = true}.
+
+\subsection{What languages can be recognized by a DFA?}
+
+This is a complicated question, but we can say some things with little effort.
+
+For example, for an alphabet $\Sigma$, the language $\Sigma^*$ is easily recognizable by a DFA.
+For example, if $\Sigma^*$ is $\{a, b\}$, the following DFA does what we want:
+
+
+% <img src="http://reedoei.com/files/dfa-example-all.svg" style="width: 20%; height: 20%">
+
+Similarly, the empty language, $\{\}$ is also easily recognizable by a DFA.
+
+What about other languages?
+Well, we can also recognize the set of strings with even length, for any alphabet $\Sigma$, using an automaton similar to the following:
+
+% <img src="http://reedoei.com/files/dfa-example-even.svg" style="width: 40%; height: 40%">
+
+We won't verify any of these in Coq, but you can convince yourself that they do in fact work.
+
+Let's consider some more general questions of recognizability:
+
+For example, if $L_1$ and $L_2$ are recognizable by some DFAs $M_1$ and $M_2$, respectively, is $L_1 \cap L_2$?
+What about $L_1 \cup L_2$?
+What about $\overline{L_1}$?
+
+It's probably good to spend some time on your own thinking about whether or not these languages are always, sometimes, or never recognizable by a DFA.
+Keep in mind it must be a **single DFA** processing the languages in a **single pass**.
+
+Note that both DFAs operate over the same alphabet.
+
+\subsection{DFA Closure Properties}
+
+As it turns out, the answer to all of these is "Yes, always!"
+These properties are sometimes referred to as "closure properties."
+
+\subsubsection{DFA Complement}
+
+Let's consider the problem of defining a DFA $\overline{M}$ given a DFA $M$, so that $L(\overline{M}) = \Sigma^* \setminus L(M)$, that is, $\overline{M}$ recognizes the complement of $M$.
+
+This is actually quite simple, we just need to "flip" the final states: if $q \in F$ is a final state, then $q \not\in \overline{F}$, and if $q \not\in F$ then $q \in \overline{F}$.
+Everything else is the same!
+
+Let's define this new set of final states, using the \mintinline{coq}{negb} function, where \mintinline{coq}{negb true = false} and \mintinline{coq}{negb false = true}, as you would expect.
+
+\begin{minted}{coq}
+Definition not_dfa_f {A B : Type} (M : dfa A B) (q : A) : bool := negb (F M q).
+\end{minted}
+
+Then we can define the DFA $\overline{M}$, which we will call \mintinline{coq}{not_dfa M}, to be slightly more descriptive, as follows:
+
+\begin{minted}{coq}
+Definition not_dfa {A B : Type} (M : dfa A B) : dfa A B :=
+  Build_dfa A B (t M) (s M) (not_dfa_f M).
+\end{minted}
+
+This definition says that everything that we use the same types \mintinline{coq}{A} and \mintinline{coq}{B}, the same transition function \mintinline{coq}{t M}, the same start state \mintinline{coq}{s M}, and only change the set of final states from \mintinline{coq}{F} to \mintinline{coq}{not_dfa_f M}.
+
+\paragraph{Proof of correctness}
+
+Hopefully it makes intuitive sense that this is the correct way to define $\overline{M}$, but now let's prove it in Coq.
+
+We can state the theorem that this definition is correct as follows:
+
+\begin{minted}{coq}
+Theorem not_dfa_correct :
+  forall {A B : Type} (M : dfa A B) (str : list B),
+   accepted M str = true <-> accepted (not_dfa M) str = false.
+\end{minted}
+
+\paragraph{Mirroring Lemma}
+
+Before proving this, however, we'll prove that $\overline{M}$ "mirrors" $M$: if after processing the string $w$ with $M$ we are in state $q$, then after processing the same string $w$ with $\overline{M}$ we are also in state $q$.
+This lemma makes proving the above theorem quite simple.
+We can state the lemma as follows:
+
+\begin{minted}{coq}
+Lemma not_dfa_mirror {A B : Type} (M : dfa A B) :
+  forall (str : list B), tStar M (s M) str = tStar (not_dfa M) (s M) str.
+\end{minted}
+
+However, we will state and prove yet one more lemma before we prove the statement above.
+We'll need a very useful fact about $\delta^*$ that should be obvious from the definition:
+
+$\delta^*(q, w \cdot x) = \delta(\delta^*(q, w), x)$
+
+We can write this lemma in Coq as follows:
+
+\begin{minted}{coq}
+Lemma tStar_step :
+  forall {A B : Type} (M : dfa A B) (str : list B) (q : A) (x : B),
+    tStar M q (str ++ [x]) = t M (tStar M q str) x.
+Proof.
+\end{minted}
+
+As always, we first introduce some variables:
+
+\begin{minted}{coq}
+intros A B M str.
+\end{minted}
+
+As with most proofs about lists, we proceed by induction on the list.
+The base case is easily solved by \mintinline{coq}{intuition}.
+
+\begin{minted}{coq}
+induction str.
+intuition.
+\end{minted}
+
+Note that we don't introduce variables for \mintinline{coq}{q} and \mintinline{coq}{x} because that would over specialize our induction hypothesis to the point where we couldn't prove our goal anymore.
+After proving the base case, which is still easily true, we would get the following.
+Note that the below is not the entire state, only the part that's relevant.
+
+\begin{minted}{coq}
+IHstr : tStar M q (str ++ [x]) = t M (tStar M q str) x
+______________________________________(1/1)
+tStar M (t M q a) (str ++ [x]) = t M (tStar M (t M q a) str) x
+\end{minted}
+
+Let's think about what this is saying: if we start from some state \mintinline{coq}{q}, then process \mintinline{coq}{str ++ [x]}, we ge the same thing as if we started from \mintinline{coq}{w}, processed \mintinline{coq}{str}, and now process \mintinline{coq}{x}.
+That's true, of course, and so is the goal, but the goal doesn't directly follow from the inductive hypothesis.
+
+Instead, by not introducing \mintinline{coq}{q}, we obtain the following more general induction hypothesis:
+
+\begin{minted}{coq}
+IHstr : forall (q : A) (x : B),
+        tStar M q (str ++ [x]) = t M (tStar M q str) x
+\end{minted}
+
+Then we may simply utilize the inductive hypothesis with \mintinline{coq}{q} being \mintinline{coq}{t M q a} (note these \mintinline{coq}{q} are different), as follows:
+
+\begin{minted}{coq}
+exact (IHstr (t M q a) x).
+\end{minted}
+
+Now let's prove the mirroring property from above:
+
+\begin{minted}{coq}
+Lemma not_dfa_mirror {A B : Type} (M : dfa A B) :
+  forall (str : list B), tStar M (s M) str = tStar (not_dfa M) (s M) str.
+Proof.
+\end{minted}
+
+Again, we will proceed by induction, but in a slightly different fashion.
+
+A standard induction proof of some property \mintinline{coq}{P} for lists is generally as follows:
+
+- Prove that \mintinline{coq}{P []} holds.
+- Prove that if \mintinline{coq}{P xs} holds, then \mintinline{coq}{P (a :: xs)} holds, for any \mintinline{coq}{a}.
+
+However, consider what this means for our property.
+The base case works fine, but the inductive case causes issues:
+
+We want to show that if $\delta^*(s, w) = \overline{\delta}^*(s, w)$, then for any $x \in \Sigma$, we have $\delta^*(s, x \cdot w) = \overline{\delta}^*(s, x \cdot w)$.
+Of course, this is true, but we have no information about what state we end up in after processing $x$!
+Whereas, we do know something about the state $\delta^*(s, w)$.
+We want to show the following instead: if $\delta^*(s, w) = \overline{\delta}^*(s, w)$, then for any $x \in \Sigma$, we have $\delta^*(s, w \cdot x) = \overline{\delta}^*(s, w \cdot x)$.
+This is equivalent, but much easier to prove.
+
+To use this form of induction, we use the lemma \mintinline{coq}{rev_ind} defined in the Coq list library:
+
+\begin{minted}{coq}
+apply rev_ind.
+\end{minted}
+
+Note that Coq can infer we want to do induction on \mintinline{coq}{str} because of our goal:
+
+\begin{minted}{coq}
+forall str : list B, tStar M (s M) str = tStar (not_dfa M) (s M) str
+\end{minted}
+
+The base case can be proven by \mintinline{coq}{intuition}.
+In the inductive case after introducing variables, we have the following.
+Note that some of the unimportant details have been omitted, so your screen won't look identical.
+
+\begin{minted}{coq}
+H : tStar M (s M) l = tStar (not_dfa M) (s M) l
+______________________________________(1/1)
+tStar M (s M) (l ++ [x]) = tStar (not_dfa M) (s M) (l ++ [x])
+\end{minted}
+
+This is a perfect place to use our lemma \mintinline{coq}{tStar_step} from before!
+Let's use it twice: once for the left hand side, and once for the right hand side:
+
+\begin{minted}{coq}
+rewrite tStar_step.
+rewrite tStar_step.
+\end{minted}
+
+Coq can infer what we want to do, so we don't need to write anything else.
+In fact, when we do multiple rewrites in a row, we can instead write:
+
+\begin{minted}{coq}
+rewrite tStar_step, tStar_step.
+\end{minted}
+
+In fact, we could even use the tactic \mintinline{coq}{repeat} to make this simpler, if we didn't know how many rewrites we wanted (though I'll leave it as the above):
+
+\begin{minted}{coq}
+repeat (rewrite tStar_step).
+\end{minted}
+
+Now we can simplify to get:
+
+\begin{minted}{coq}
+H : tStar M (s M) l = tStar (not_dfa M) (s M) l
+______________________________________(1/1)
+t M (tStar M (s M) l) x = t M (tStar (not_dfa M) (s M) l) x
+\end{minted}
+
+Note that now we can use the inductive hypothesis to rewrite the two sides to be the same (it doesn't matter which way we rewrite), letting us finish the proof as follows:
+
+\begin{minted}{coq}
+simpl.
+rewrite H.
+reflexivity.
+Qed.
+\end{minted}
+
+\paragraph{Main Theorem}
+
+Now we can finally prove the main theorem, about the correctness of our definition of $\overline{M}$:
+
+\begin{minted}{coq}
+Theorem not_dfa_correct :
+  forall {A B : Type} (M : dfa A B) (str : list B),
+   accepted M str = true <-> accepted (not_dfa M) str = false.
+Proof.
+\end{minted}
+
+We start by introducing our variables and unfolding the definition of accepted, because we essentially want to prove that the final function was defined correctly.
+To do so, we will use the fact that the two DFAs mirror each other.
+
+\begin{minted}{coq}
+intros.
+unfold accepted.
+simpl.
+rewrite not_dfa_mirror.
+unfold not_dfa_f.
+\end{minted}
+
+This gives us the following goal:
+
+\begin{minted}{coq}
+F M (tStar (not_dfa M) (s M) str) = true <->
+negb (F M (tStar (not_dfa M) (s M) str)) = false
+\end{minted}
+
+We will prove each direction separately; we will do the \mintinline{coq}{->} direction first.
+To do this, we use the \mintinline{coq}{split} tactic:
+
+\begin{minted}{coq}
+split.
+\end{minted}
+
+which gives us the following:
+
+\begin{minted}{coq}
+H : F M (tStar (not_dfa M) (s M) str) = true
+______________________________________(1/2)
+negb (F M (tStar (not_dfa M) (s M) str)) = false
+\end{minted}
+
+By rewriting with \mintinline{coq}{H}, we obtain \mintinline{coq}{negb true = false}: this is true by \mintinline{coq}{intuition}.
+
+For the other direction, \mintinline{coq}{<-}, we have:
+
+\begin{minted}{coq}
+H : negb (F M (tStar (not_dfa M) (s M) str)) = false
+______________________________________(1/1)
+F M (tStar (not_dfa M) (s M) str) = true
+\end{minted}
+
+Because our values are booleans, it is easy to do case analysis.
+To do this, we use \mintinline{coq}{induction} on the boolean value.
+`induction` works for any inductively defined type, including booleans which are defined as follows:
+
+\begin{minted}{coq}
+Inductive bool : Set := true : bool | false : bool
+\end{minted}
+
+Then each case follows by \mintinline{coq}{intuition}:
+
+\begin{minted}{coq}
+induction (F M (tStar (not_dfa M) (s M) str)).
+intuition.
+intuition.
+Qed.
+\end{minted}
+
+This completes the proof, showing that $\overline{L(M)}$ is a language recognized by a DFA.
+For example, this means that, if we can define a DFA which recognizes strings of even length, we may use the above definition to define an automaton which recognizes strings of odd length.
+
+\subsubsection{DFA Conjunction}
+
+So how do we show that we can recognize the language $L_1 \cap L_2$, given that both languages are recognized by DFAs?
+Essentially, we want to process these strings in "parallel", working in both DFAs at the same time?
+We can do this by keep track of the state in $M_1$ and the state in $M_2$ separately, as follows, using a new DFA, $M'$:
+
+- The set of states is the cross product of the states of $M_1$ and $M_2$, $Q_1 \times Q_2$.
+- The alphabet is the same, because we want to be able to process all the same strings.
+- The transition function is essentially just a combination of the two transition functions. Recalling that our states are now pairs of the states in the old DFAs, we can define $\delta^*$ as follows:
+
+$\delta'((q_1, q_2), x) = (\delta_1(q_1, x), \delta_2(q_2, x))$
+
+- The start state is naturally just the pair of the start states of the DFAs, $(s_1, s_2)$.
+- The set of final states is the cross product of the sets of final states from the DFAs: $F_1 \times F_2$.
+
+This is sometimes referred to as
+
+So why does this work?
+
+Intuitively, it's because we run the two DFAs in parallel---the first value in the pair keeps track of the state in the first DFA, and the second value keeps track of the state in the second DFA.
+Of course, we can do better than that, and show that it's true using Coq.
+
+\paragraph{Definitions}
+
+It's probably good practice to try to define \mintinline{coq}{and_dfa M N} for twice DFAs \mintinline{coq}{M} and \mintinline{coq}{N} in Coq on your own before reading the definition below.
+
+Hopefully the below Coq definition is fairly intuitive by now:
+
+\begin{minted}{coq}
+
+Definition and_dfa_trans
+  {A B C : Type} (M : dfa A B) (N : dfa C B) (q : A * C) (s : B) : A * C :=
+  match q with
+  | (qm, qn) => (t M qm s, t N qn s)
+  end.
+
+Definition and_dfa_f {A B C : Type} (M : dfa A B) (N : dfa C B) (q : A * C) : bool :=
+  match q with
+  | (a,c) => F M a && F N c
+  end.
+
+Definition and_dfa {A B C : Type} (M : dfa A B) (N : dfa C B) : dfa (A * C) B :=
+  Build_dfa (A * C) B
+            (and_dfa_trans M N) (s M, s N) (and_dfa_f M N).
+\end{minted}
+
+\paragraph{Mirroring Proof}
+
+We also prove a similar mirroring property for our definition of the \mintinline{coq}{and_dfa}:
+
+\begin{minted}{coq}
+Lemma and_dfa_mirror_m
+  {A B C : Type} (M : dfa A B) (N : dfa C B) :
+    forall (str : list B), tStar M (s M) str = fst (tStar (and_dfa M N) (s (and_dfa M N)) str).
+\end{minted}
+
+Again we proceed by induction, specifically, using \mintinline{coq}{rev_ind} as before, solving the base case of an empty string by \mintinline{coq}{intuition}:
+
+\begin{minted}{coq}
+apply rev_ind.
+
+intuition.
+
+intros.
+\end{minted}
+
+Next we use the lemma \mintinline{coq}{tStar_step} twice again, for the left hand side and right hand side:
+
+\begin{minted}{coq}
+rewrite tStar_step, tStar_step.
+\end{minted}
+
+Now we have:
+\begin{minted}{coq}
+H : tStar M (s M) l = fst (tStar (and_dfa M N) (s (and_dfa M N)) l)
+______________________________________(1/1)
+t M (tStar M (s M) l) x =
+fst (t (and_dfa M N) (tStar (and_dfa M N) (s (and_dfa M N)) l) x)
+\end{minted}
+
+By our definition of \mintinline{coq}{t} for \mintinline{coq}{and_dfa}, \mintinline{coq}{tStar (and_dfa M N) (s (and_dfa M N)) l} will be a pair, so we use \mintinline{coq}{destruct} on it to get access to this pair, which will be called \mintinline{coq}{(a,c)}.
+That is, $\delta'^*((s_m, s_n), \ell) = (a,c)$.
+We also want to \mintinline{coq}{unfold} the definition of \mintinline{coq}{and_dfa} so we can use the definition of \mintinline{coq}{t} which is "inside" of it:
+
+\begin{minted}{coq}
+destruct (tStar (and_dfa M N) (s (and_dfa M N)) l).
+unfold and_dfa.
+simpl.
+\end{minted}
+
+Now we have:
+
+\begin{minted}{coq}
+H : tStar M (s M) l = fst (a, c)
+______________________________________(1/1)
+t M (tStar M (s M) l) x = t M a x
+\end{minted}
+
+By rewriting the inductive hypothesis, this is obviously true by the definition of \mintinline{coq}{fst}, and \mintinline{coq}{intuition} can solve this for us, finishing the proof.
+
+\begin{minted}{coq}
+rewrite H.
+intuition.
+Qed.
+\end{minted}
+
+Note the proof for the second component is identical, except with \mintinline{coq}{snd} and \mintinline{coq}{N} instead of \mintinline{coq}{fst} and \mintinline{coq}{M}.
+
+\paragraph{Main Theorem}
+
+First we must define
+
+We state the theorem similarly to the previous theorem about complements:
+
+\begin{minted}{coq}
+Theorem and_dfa_mirror_m
+  {A B C : Type} (M : dfa A B) (N : dfa C B) :
+    forall (str : list B), tStar M (s M) str = fst (tStar (and_dfa M N) (s (and_dfa M N)) str).
+Proof.
+\end{minted}
+
+We introduce our variables and \mintinline{coq}{unfold accepted} again.
+Then using our mirroring properties from above, our goal becomes:
+
+\begin{minted}{coq}
+F (and_dfa M N) (tStar (and_dfa M N) (s (and_dfa M N)) str) = true <->
+F M (fst (tStar (and_dfa M N) (s (and_dfa M N)) str)) &&
+F N (snd (tStar (and_dfa M N) (s (and_dfa M N)) str)) = true
+\end{minted}
+
+This is a bit of a mess, but what's important is that all of these "`F`s" are applied to the same thing: \mintinline{coq}{tStar (and_dfa M N) (s (and_dfa M N)) str}.
+We can destruct this, as shown below:
+
+\begin{minted}{coq}
+destruct (tStar (and_dfa M N) (s (and_dfa M N)) str).
+simpl.
+\end{minted}
+
+Giving us the following goal:
+
+\begin{minted}{coq}
+F (and_dfa M N) (a, c) = true <-> F M (fst (a, c)) && F N (snd (a, c)) = true
+\end{minted}
+
+We could do the case analysis ourselves---but luckily so can \mintinline{coq}{intuition}:
+
+\begin{minted}{coq}
+intuition.
+Qed.
+\end{minted}
+
+This concludes our proof that our new DFA really does recognize the language $L_1 \cap L_2$.
+
+\subsection{Remarks}
+
+Note that we have shown above that $L_1 \cap L_2$ and $\overline{L}$ are recognizable by a DFA.
+However, this implies that both the languages $L_1 \cup L_2$ and $L_1 \implies L_2$ are also recognizable.
+We define $L_1 \implies L_2$ as below:
+
+$L_1 \implies L_2 := \{ w \in \Sigma^* : w \in L_1 \implies w \in L_2 \}$
+
+The following are also true:
+
+$L_1 \cup L_2 = \overline{(\overline{L_1} \cap \overline{L_2})}$
+
+$L_1 \implies L_2 = \overline{L_1} \cup L_2$
+
+The reader may check that the above equalities hold.
+Since we can define $\cup$ and $\implies$ in terms of $\cap$ and complements, we can also recognize unions and implications.
+
+\subsection{Conclusion}
+
+We have shown some fairly general properties languages which are recognizable by DFAs.
+In the next part, we will show an alternate model of computation, called a non-deterministic finite automaton, that turns out to be quite useful, and prove some surprising facts about it.
+

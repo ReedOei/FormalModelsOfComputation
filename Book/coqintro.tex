@@ -1,0 +1,63 @@
+\section{Introduction to Coq}
+
+[Coq](https://coq.inria.fr/) is a system for theorem proving, called a *proof assistant*.
+It includes several sub-programming languages for variable specifications of definitions and proofs.
+
+\subsection{Curry-Howard Isomorphism}
+
+The whole thing is based on the Curry-Howard isomorphism~\cite{curry-howard}; the basic idea is that *types are propositions, programs are proofs*.
+What does that mean?
+
+Essentially, if it is possible to construct a value of some type, $\tau$, then that type is "true", in the sense that we can produce a proof of it.
+And what is the proof?
+The value of type $\tau$.
+This probably seems weird, because it's weird to think of the type \mintinline{coq}{Int} as being "true", but it just means that I can prove that an \mintinline{coq}{Int} exists: just pick your favorite one (mine is \mintinline{coq}{0}).
+
+In this case, a slightly more complicated example will probably make more sense.
+Let's consider implication: if $P$, then $Q$.
+What does this correspond to as a type?
+A function!
+Proving if $P$, then $Q$ is the same as writing a function that takes a value of type $P$ and produces a value of type $Q$.
+In Java we might write:
+
+\begin{minted}{java}
+public <P, Q> Q f(P p) {
+    // ...
+}
+\end{minted}
+
+but since this series is about Coq, I'll mostly write in Coq from now on:
+
+\begin{minted}{coq}
+Definition f : P -> Q := (* ... *).
+(* alternatively *)
+Definition f (p : P): Q := (* ... *).
+\end{minted}
+
+As a more concrete example of implication, take the following introduction rule in intuitionistic logic~\cite{intuit-logic}.
+
+$$ \frac{A~~~B}{A \wedge B} $$
+
+This rule says that if $A$ is true, and $B$ is true, then $ A \wedge B $ is true.
+This is a fairly obvious definition for what "and" means, and it's a nice and simple example to demonstrate how the Curry-Howard isomorphism works.
+Recalling that "types are propositions", let's consider what the proposition here is: if $A$ and $B$, then $A \wedge B$.
+What would this mean in a programming lanugage?
+If you have a value of type \mintinline{coq}{a}, and a value of type \mintinline{coq}{b}, then you can create a value which contains values of both type \mintinline{coq}{a} and \mintinline{coq}{b}.
+That is, a *pair*, of the two values.
+
+In Haskell, we would write this as:
+
+\begin{minted}{haskell}
+prop :: a -> b -> (a, b)
+prop a b = (a, b)
+\end{minted}
+
+The first line, the type, is the proposition.
+The second line, the definition of the function, is the proof: a program that shows how to go from the assumptions (a value of type \mintinline{coq}{a} exists, and a value of type \mintinline{coq}{b} exists), to the conclusion (so there is a value which contains values of both types).
+
+Translating to Coq, this becomes:
+
+\begin{minted}{coq}
+Definition conjunc (a : A) (b : B) : A /\ B := conj a b.
+\end{minted}
+
