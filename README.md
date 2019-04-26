@@ -2,9 +2,9 @@
 
 The source code for the tutorials on my [blog](http://reedoei.com/blog), a WIP series on defining the fundamentals of the theory of computation, following the topics below.
 
-- Introduction: [Part 1](http://reedoei.com/blog?post=A%20Formal%20Introduction%20to%20Models%20of%20Computation%20in%20Coq%20%28Part%201%29)
-- DFAs: [Part 2](http://reedoei.com/blog?post=A%20Formal%20Introduction%20to%20Models%20of%20Computation%20in%20Coq%20%28Part%202%29)
-- NFAs
+- Introduction: [Part 1](http://reedoei.com/blog?post=intro-models-of-comp-p1)
+- DFAs: [Part 2](http://reedoei.com/blog?post=intro-models-of-comp-p2)
+- NFAs: [Part 3](http://reedoei.com/blog?post=intro-models-of-comp-p3)
 - Proof Automation
 - Regular Expressions
 - Equivalence of DFAs, NFAs, and Regular Expressions

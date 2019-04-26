@@ -36,8 +36,8 @@ Ltac impossible :=
   | H : [] = _ ++ (_ :: _) |- _ => symmetry in H; apply app_not_empty in H; contradiction
   end.
 
-Tactic Notation "prove" "with" tactic(tac) :=
-  repeat (
+Tactic Notation "prove" int_or_var(n) "with" tactic(tac) :=
+  do n (
     intuition;
     try simpl_hyp;
     try impossible;
@@ -46,7 +46,10 @@ Tactic Notation "prove" "with" tactic(tac) :=
     try rewrite_each;
     try tac).
 
-Ltac prove := prove with idtac.
+Tactic Notation "prove" "stop" int_or_var(n) := prove n with idtac.
+Tactic Notation "prove" "with" tactic(tac) := prove 5 with tac.
+
+Tactic Notation "quick" tactic(tac) := tac; prove with idtac.
 
 Tactic Notation "autoinduction" ident(x) "with" tactic(tac) :=
     induction x;
